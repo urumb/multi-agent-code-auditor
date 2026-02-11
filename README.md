@@ -40,7 +40,7 @@ graph TD
 ### Technical Components
 
 - **LangGraph**: Orchestrates the state machine and agent workflow.
-- **Ollama**: Provides local inference for agents (default: `llama3`).
+- **Ollama**: Provides local inference for agents (Optimized for llama3.2).
 - **ChromaDB**: Implements RAG (Retrieval-Augmented Generation) memory to recall past audit findings and ensure consistency across analysis sessions.
 - **Python 3.12+**: Core runtime environment.
 
@@ -50,7 +50,8 @@ graph TD
 
 - **Python 3.10+**
 - **Ollama** running locally (`http://localhost:11434`)
-- Recommended Model: `llama3` or `deepseek-coder`
+- **Hardware**: Minimum 8GB RAM (Optimized for CPU-based inference).
+- **Recommended Model**: llama3.2 (Selected for its high performance-to-memory ratio).
 
 ### Installation
 
@@ -63,8 +64,12 @@ graph TD
 2. **Set up virtual environment:**
    ```bash
    python -m venv .venv
-   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-   ```
+
+   # On Windows (PowerShell):
+   .venv\Scripts\activate
+
+   # On Linux/macOS:
+   source .venv/bin/activate
 
 3. **Install dependencies:**
    ```bash
