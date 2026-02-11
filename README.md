@@ -22,26 +22,19 @@ The core logic relies on a state graph where code flows through a pipeline of sp
 
 ```mermaid
 graph TD
-    Start([Start]) --> Manager[Manager Agent\n(Decomposition)]
-    Manager --> Retrieve[Memory Retrieval\n(ChromaDB)]
+    Start([Start]) --> Manager[Manager Agent: Decomposition]
+    Manager --> Retrieve[Memory Retrieval: ChromaDB]
     
     subgraph Analysis Layer [Parallel Execution]
-        Retrieve --> Security[Security Agent\n(OWASP / CWE Scanning)]
-        Retrieve --> Performance[Performance Agent\n(Big-O / Memory)]
+        Retrieve --> Security[Security Agent: OWASP Scanning]
+        Retrieve --> Performance[Performance Agent: Big-O Analysis]
     end
     
-    Security --> Reviewer[Reviewer Agent\n(Synthesis & Reporting)]
+    Security --> Reviewer[Reviewer Agent: Synthesis]
     Performance --> Reviewer
     
     Reviewer --> Save[Persist Findings]
     Save --> End([End])
-    
-    style Start fill:#f9f,stroke:#333
-    style End fill:#f9f,stroke:#333
-    style Manager fill:#bbf,stroke:#333
-    style Security fill:#f96,stroke:#333
-    style Performance fill:#9f6,stroke:#333
-    style Reviewer fill:#ff9,stroke:#333
 ```
 
 ### Technical Components
