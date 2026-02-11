@@ -1,0 +1,36 @@
+# Python Environment
+__pycache__/
+*.pyc
+.venv/
+venv/
+env/
+
+# Build & Distribution
+build/
+dist/
+*.egg-info/
+
+# Environment Variables
+.env
+
+# Local Data & Models
+local_models/
+chroma_db/
+
+# System Files
+.DS_Store
+Thumbs.db
+
+# Internal Agent/IDE Files
+.agent/
+.anthropic/
+.vscode/
+.idea/
+
+# Logs, Reports & Testing
+*.log
+*.audit_report.md
+.pytest_cache/
+.coverage
+htmlcov/
+.ipynb_checkpoints
