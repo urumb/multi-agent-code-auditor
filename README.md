@@ -54,16 +54,15 @@ The audit pipeline is built as a state graph of collaborating agents.
 
 ```mermaid
 graph TD
-    Start([Start]) --> Manager[Manager Agent\nRepository Decomposition]
-    Manager --> Memory[Retrieve Context\nChromaDB]
-
-    subgraph Parallel Analysis
-        Memory --> Security[Security Agent\nOWASP / CWE Detection]
-        Memory --> Performance[Performance Agent\nComplexity Analysis]
-        Memory --> Quality[Code Quality Agent\nBest Practices]
+    Start([Start]) --> Manager[Manager Agent: Decomposition]
+    Manager --> Retrieve[Memory Retrieval: ChromaDB]
+    
+    subgraph Analysis Layer [Parallel Execution]
+        Retrieve --> Security[Security Agent: OWASP Scanning]
+        Retrieve --> Performance[Performance Agent: Big-O Analysis]
     end
-
-    Security --> Reviewer[Reviewer Agent\nSynthesis]
+    
+    Security --> Reviewer[Reviewer Agent: Synthesis]
     Performance --> Reviewer
     Quality --> Reviewer
 
@@ -73,67 +72,33 @@ graph TD
 
 Code is ingested by the Manager Agent, split into chunks, enriched with context from ChromaDB, then analyzed in parallel by specialized agents. The Reviewer Agent aggregates all findings into a prioritized report which is persisted for future reference.
 
----
-
-## Technical Stack
-
-### Backend
-- **Python 3.10+**
-- **FastAPI** — REST API layer
-- **LangGraph** — agent orchestration and state machine
-- **ChromaDB** — RAG memory store for historical findings
-- **Ollama** — local LLM inference runtime (optimized for `llama3.2`)
-
-### Frontend
-- **Next.js 14** — dashboard and UI
-- **TypeScript** — type-safe components
-- **TailwindCSS** — styling
-- **ReactFlow** — agent graph visualization
-
-### AI Models
-- DeepSeek R1
-- Llama 3 / Llama 3.2
-- CodeLlama
-
----
-
-## Project Status
-
-> 🚧 **Active Development**
-
-The backend audit pipeline currently analyzes **local source files**. The frontend dashboard is operational and displays agent logs, findings, and audit progress in real time.
-
-**Planned input types (in progress):**
-- GitHub repository scanning
-- Uploaded source files
-- Direct code pasting
-
----
-
-## ⚠️ Deployment Note
-
-> **Important:**
-> The AI agents rely on local LLMs through Ollama.
-> Public deployments (e.g. Vercel) will only serve the frontend dashboard UI.
-> The full analysis pipeline requires a backend running **locally** with Ollama installed and a model downloaded.
-
-Minimum hardware: **8GB RAM** (optimized for CPU-based inference).
-
----
+- **LangGraph**: Orchestrates the state machine and agent workflow.
+- **Ollama**: Provides local inference for agents (Optimized for llama3.2).
+- **ChromaDB**: Implements RAG (Retrieval-Augmented Generation) memory to recall past audit findings and ensure consistency across analysis sessions.
+- **Python 3.12+**: Core runtime environment.
 
 ## Getting Started
 
 ### Prerequisites
 
-- Python 3.10+
-- Node.js 18+
-- [Ollama](https://ollama.com) installed locally
+- **Python 3.10+**
+- **Ollama** running locally (`http://localhost:11434`)
+- **Hardware**: Minimum 8GB RAM (Optimized for CPU-based inference).
+- **Recommended Model**: llama3.2 (Selected for its high performance-to-memory ratio).
 
 ---
 
 ## Running the Project
 
-### 1. Clone the Repository
+2. **Set up virtual environment:**
+   ```bash
+   python -m venv .venv
+
+   # On Windows (PowerShell):
+   .venv\Scripts\activate
+
+   # On Linux/macOS:
+   source .venv/bin/activate
 
 ```bash
 git clone https://github.com/urumb/multi-agent-code-auditor.git
