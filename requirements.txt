@@ -1,6 +1,11 @@
+fastapi
+uvicorn
 langgraph
 langchain
-langchain-ollama
-chromadb
-python-dotenv
+langchain-community
 pydantic
+python-multipart
+requests
+aiofiles
+
+# Install Ollama separately from https://ollama.com
