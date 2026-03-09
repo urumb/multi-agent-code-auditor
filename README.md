@@ -75,14 +75,14 @@ Code is ingested by the Manager Agent, split into chunks, enriched with context 
 
 ---
 
-## Tech Stack
+## Technical Stack
 
 ### Backend
 - **Python 3.10+**
 - **FastAPI** — REST API layer
 - **LangGraph** — agent orchestration and state machine
 - **ChromaDB** — RAG memory store for historical findings
-- **Ollama** — local LLM inference runtime
+- **Ollama** — local LLM inference runtime (optimized for `llama3.2`)
 
 ### Frontend
 - **Next.js 14** — dashboard and UI
@@ -92,7 +92,7 @@ Code is ingested by the Manager Agent, split into chunks, enriched with context 
 
 ### AI Models
 - DeepSeek R1
-- Llama 3
+- Llama 3 / Llama 3.2
 - CodeLlama
 
 ---
@@ -117,6 +117,8 @@ The backend audit pipeline currently analyzes **local source files**. The fronte
 > Public deployments (e.g. Vercel) will only serve the frontend dashboard UI.
 > The full analysis pipeline requires a backend running **locally** with Ollama installed and a model downloaded.
 
+Minimum hardware: **8GB RAM** (optimized for CPU-based inference).
+
 ---
 
 ## Getting Started
@@ -129,14 +131,14 @@ The backend audit pipeline currently analyzes **local source files**. The fronte
 
 ---
 
+## Running the Project
+
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/urumb/multi-agent-auditor.git
-cd multi-agent-auditor
+git clone https://github.com/urumb/multi-agent-code-auditor.git
+cd multi-agent-code-auditor
 ```
-
----
 
 ### 2. Backend Setup
 
@@ -144,38 +146,30 @@ cd multi-agent-auditor
 # Create and activate virtual environment
 python -m venv .venv
 
+# Windows (PowerShell)
+.venv\Scripts\activate
+
 # macOS / Linux
 source .venv/bin/activate
 
-# Windows
-.venv\Scripts\activate
-
 # Install dependencies
 pip install -r requirements.txt
-```
 
-Configure environment variables:
-
-```bash
+# Configure environment
 cp .env.example .env
-# Edit .env if your Ollama instance uses a different port
 ```
-
----
 
 ### 3. Ollama Setup
 
 ```bash
 # Pull a recommended model
-ollama pull deepseek-coder
+ollama pull llama3.2
 # or
-ollama pull llama3
+ollama pull deepseek-coder
 
-# Start Ollama (if not already running as a service)
+# Start Ollama (if not running as a service)
 ollama serve
 ```
-
----
 
 ### 4. Start the Backend
 
@@ -184,8 +178,6 @@ python main.py
 # or
 uvicorn main:app --reload
 ```
-
----
 
 ### 5. Start the Frontend
 
@@ -217,7 +209,7 @@ The system will:
 
 ---
 
-## Roadmap
+## Project Roadmap
 
 - [ ] Repository-level analysis
 - [ ] GitHub repository scanning
