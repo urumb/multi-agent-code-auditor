@@ -1,35 +1,38 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ResultTabs } from "@/components/results/result-tabs";
-import { IssueCardSkeleton } from "@/components/results/issue-card-skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
-import { fetchAuditResult } from "@/lib/api";
-import type { AuditResult } from "@/types";
-import { FileSearch, Play, Download, FileJson } from "lucide-react";
+import { FileSearch, Play, Download, FileJson, FileText } from "lucide-react";
 import Link from "next/link";
 import jsPDF from "jspdf";
 import { toast } from "sonner";
+import type { AuditResultResponse, FileAuditResult } from "@/lib/api";
 
 /**
- * Results page displaying categorized audit findings.
+ * Results page displaying per-file audit reports from the backend.
+ * Reads the latest audit result from localStorage (set by useAudit hook).
  */
 export default function ResultsPage() {
-    const [result, setResult] = useState<AuditResult | null>(null);
+    const [result, setResult] = useState<AuditResultResponse | null>(null);
     const [loading, setLoading] = useState(true);
+    const [expandedFile, setExpandedFile] = useState<string | null>(null);
 
     useEffect(() => {
-        async function loadResults() {
-            try {
-                const data = await fetchAuditResult("latest");
-                setResult(data);
-            } finally {
-                setLoading(false);
+        try {
+            const stored = localStorage.getItem("latestAuditResult");
+            if (stored) {
+                setResult(JSON.parse(stored) as AuditResultResponse);
             }
+        } catch {
+            // Corrupted localStorage — ignore
+        } finally {
+            setLoading(false);
         }
-
-        loadResults();
     }, []);
+
+    const toggleFile = (filePath: string) => {
+        setExpandedFile((prev) => (prev === filePath ? null : filePath));
+    };
 
     const exportAsJson = () => {
         if (!result) return;
@@ -57,68 +60,38 @@ export default function ResultsPage() {
             const pageWidth = doc.internal.pageSize.getWidth();
             let yPos = 20;
 
-            // Title
             doc.setFontSize(22);
             doc.text("Audit Report", 14, yPos);
             yPos += 10;
 
-            // Metadata
             doc.setFontSize(12);
-            doc.text(`Project: ${result.repository}`, 14, yPos);
+            doc.text(`Total Files: ${result.total_files}`, 14, yPos);
             yPos += 8;
             doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, yPos);
-            yPos += 8;
-            doc.text(`Status: ${result.status.toUpperCase()}`, 14, yPos);
             yPos += 15;
 
-            // Summary
-            doc.setFontSize(14);
-            doc.text("Summary of Findings", 14, yPos);
-            yPos += 8;
-            doc.setFontSize(10);
+            result.results.forEach((file) => {
+                if (yPos > doc.internal.pageSize.getHeight() - 40) {
+                    doc.addPage();
+                    yPos = 20;
+                }
 
-            // Simple word wrap for summary
-            const splitSummary = doc.splitTextToSize(result.summary, pageWidth - 28);
-            doc.text(splitSummary, 14, yPos);
-            yPos += (splitSummary.length * 6) + 10;
+                doc.setFontSize(14);
+                doc.text(`File: ${file.file_path}`, 14, yPos);
+                yPos += 8;
 
-            // Group findings by severity
-            const severities: ("critical" | "warning" | "info")[] = ["critical", "warning", "info"];
-
-            severities.forEach((severity) => {
-                const items = result.findings.filter(f => f.severity === severity);
-                if (items.length > 0) {
-                    if (yPos > doc.internal.pageSize.getHeight() - 40) {
-                        doc.addPage();
-                        yPos = 20;
-                    }
-
-                    doc.setFontSize(14);
-                    doc.text(`${severity.charAt(0).toUpperCase() + severity.slice(1)} Issues (${items.length})`, 14, yPos);
-                    yPos += 8;
-
-                    items.forEach((item, index) => {
-                        if (yPos > doc.internal.pageSize.getHeight() - 50) {
-                            doc.addPage();
-                            yPos = 20;
-                        }
-
-                        doc.setFontSize(11);
-                        doc.text(`${index + 1}. ${item.title}`, 14, yPos);
-                        yPos += 6;
-
-                        doc.setFontSize(9);
-                        doc.text(`File: ${item.file}:${item.line}  |  Category: ${item.category}`, 18, yPos);
-                        yPos += 6;
-
-                        const splitDesc = doc.splitTextToSize(`Description: ${item.description}`, pageWidth - 32);
-                        doc.text(splitDesc, 18, yPos);
-                        yPos += (splitDesc.length * 5) + 4;
-
-                        const splitFix = doc.splitTextToSize(`Suggested Fix: ${item.suggestedFix.substring(0, 150)}...`, pageWidth - 32);
-                        doc.text(splitFix, 18, yPos);
-                        yPos += (splitFix.length * 5) + 10;
-                    });
+                if (file.error) {
+                    doc.setFontSize(10);
+                    doc.text(`Error: ${file.error}`, 14, yPos);
+                    yPos += 12;
+                } else {
+                    doc.setFontSize(10);
+                    const lines = doc.splitTextToSize(
+                        file.final_report || "No report generated.",
+                        pageWidth - 28
+                    );
+                    doc.text(lines, 14, yPos);
+                    yPos += lines.length * 5 + 10;
                 }
             });
 
@@ -130,69 +103,46 @@ export default function ResultsPage() {
         }
     };
 
-    return (
-        <div className="space-y-8">
-            {/* Page header */}
-            <div className="flex items-center justify-between">
+    /** Renders the loading skeleton. */
+    if (loading) {
+        return (
+            <div className="space-y-8">
                 <div>
                     <h1 className="text-2xl font-semibold text-foreground tracking-tight">
                         Results
                     </h1>
-                    <div className="flex items-center gap-3 mt-1">
-                        <p className="text-sm text-muted-foreground">
-                            {result
-                                ? `Audit findings for ${result.repository}`
-                                : "View your latest audit findings."}
-                        </p>
-                        {result && (
-                            <div className="flex items-center gap-2">
-                                <span className="inline-flex items-center gap-1.5 rounded-full border bg-emerald-500/10 text-emerald-400 border-emerald-500/20 px-2.5 py-0.5 text-xs font-medium">
-                                    {result.status}
-                                </span>
-                            </div>
-                        )}
-                    </div>
+                    <p className="text-sm text-muted-foreground mt-1">
+                        Loading results...
+                    </p>
                 </div>
-
-                {/* Export Actions */}
-                {result && result.findings.length > 0 && (
-                    <div className="flex items-center gap-3">
-                        <button
-                            type="button"
-                            onClick={exportAsJson}
-                            className="flex items-center gap-2 rounded-lg bg-white/5 backdrop-blur-md border border-white/10 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-white/10 hover:shadow-md transition-all duration-200"
-                        >
-                            <FileJson className="h-4 w-4 text-primary" />
-                            Export JSON
-                        </button>
-                        <button
-                            type="button"
-                            onClick={exportAsPdf}
-                            className="flex items-center gap-2 rounded-lg bg-white/5 backdrop-blur-md border border-white/10 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-white/10 hover:shadow-md transition-all duration-200"
-                        >
-                            <Download className="h-4 w-4 text-emerald-400" />
-                            Export PDF
-                        </button>
-                    </div>
-                )}
-            </div>
-
-            {/* Content */}
-            {loading ? (
                 <div className="space-y-4">
                     {Array.from({ length: 3 }).map((_, i) => (
-                        <IssueCardSkeleton key={i} />
+                        <div
+                            key={i}
+                            className="glass-card rounded-xl p-6 animate-pulse"
+                        >
+                            <div className="h-4 w-1/3 bg-muted/50 rounded mb-3" />
+                            <div className="h-3 w-full bg-muted/30 rounded mb-2" />
+                            <div className="h-3 w-2/3 bg-muted/30 rounded" />
+                        </div>
                     ))}
                 </div>
-            ) : result && result.findings.length > 0 ? (
-                <>
-                    {/* Summary bar */}
-                    <div className="glass-card rounded-xl p-4">
-                        <p className="text-sm text-muted-foreground">{result.summary}</p>
-                    </div>
-                    <ResultTabs findings={result.findings} />
-                </>
-            ) : (
+            </div>
+        );
+    }
+
+    /** Renders empty state if no results. */
+    if (!result || result.results.length === 0) {
+        return (
+            <div className="space-y-8">
+                <div>
+                    <h1 className="text-2xl font-semibold text-foreground tracking-tight">
+                        Results
+                    </h1>
+                    <p className="text-sm text-muted-foreground mt-1">
+                        View your latest audit findings.
+                    </p>
+                </div>
                 <EmptyState
                     icon={FileSearch}
                     title="No audits yet"
@@ -207,7 +157,97 @@ export default function ResultsPage() {
                         </Link>
                     }
                 />
-            )}
+            </div>
+        );
+    }
+
+    return (
+        <div className="space-y-8">
+            {/* Page header */}
+            <div className="flex items-center justify-between">
+                <div>
+                    <h1 className="text-2xl font-semibold text-foreground tracking-tight">
+                        Results
+                    </h1>
+                    <div className="flex items-center gap-3 mt-1">
+                        <p className="text-sm text-muted-foreground">
+                            {result.total_files} file(s) audited
+                        </p>
+                        <span className="inline-flex items-center gap-1.5 rounded-full border bg-emerald-500/10 text-emerald-400 border-emerald-500/20 px-2.5 py-0.5 text-xs font-medium">
+                            completed
+                        </span>
+                    </div>
+                </div>
+
+                {/* Export Actions */}
+                <div className="flex items-center gap-3">
+                    <button
+                        type="button"
+                        onClick={exportAsJson}
+                        className="flex items-center gap-2 rounded-lg bg-white/5 backdrop-blur-md border border-white/10 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-white/10 hover:shadow-md transition-all duration-200"
+                    >
+                        <FileJson className="h-4 w-4 text-primary" />
+                        Export JSON
+                    </button>
+                    <button
+                        type="button"
+                        onClick={exportAsPdf}
+                        className="flex items-center gap-2 rounded-lg bg-white/5 backdrop-blur-md border border-white/10 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-white/10 hover:shadow-md transition-all duration-200"
+                    >
+                        <Download className="h-4 w-4 text-emerald-400" />
+                        Export PDF
+                    </button>
+                </div>
+            </div>
+
+            {/* Per-file report cards */}
+            <div className="space-y-4">
+                {result.results.map((file: FileAuditResult) => (
+                    <div
+                        key={file.file_path}
+                        className="glass-card rounded-xl overflow-hidden"
+                    >
+                        {/* File header — clickable to expand/collapse */}
+                        <button
+                            type="button"
+                            onClick={() => toggleFile(file.file_path)}
+                            className="w-full flex items-center justify-between p-5 text-left hover:bg-white/5 transition-colors"
+                        >
+                            <div className="flex items-center gap-3">
+                                <FileText className="h-5 w-5 text-primary shrink-0" />
+                                <span className="text-sm font-medium text-foreground font-mono">
+                                    {file.file_path}
+                                </span>
+                            </div>
+                            {file.error ? (
+                                <span className="inline-flex items-center rounded-full bg-red-500/10 text-red-400 border border-red-500/20 px-2.5 py-0.5 text-xs font-medium">
+                                    error
+                                </span>
+                            ) : (
+                                <span className="inline-flex items-center rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-0.5 text-xs font-medium">
+                                    report ready
+                                </span>
+                            )}
+                        </button>
+
+                        {/* Expanded report */}
+                        {expandedFile === file.file_path && (
+                            <div className="border-t border-white/10 p-5">
+                                {file.error ? (
+                                    <p className="text-sm text-red-400">
+                                        {file.error}
+                                    </p>
+                                ) : (
+                                    <pre className="text-sm text-muted-foreground whitespace-pre-wrap font-mono leading-relaxed max-h-[600px] overflow-y-auto">
+                                        {file.final_report ||
+                                            "No report generated."}
+                                    </pre>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                ))}
+            </div>
         </div>
     );
 }

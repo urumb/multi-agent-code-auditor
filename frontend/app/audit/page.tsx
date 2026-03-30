@@ -5,14 +5,14 @@ import { ProgressIndicator } from "@/components/audit/progress-indicator";
 import { AgentActivityLog } from "@/components/audit/agent-activity-log";
 import { useAudit } from "@/hooks/use-audit";
 import { toast } from "sonner";
-import { CheckCircle, XCircle } from "lucide-react";
+import { CheckCircle, XCircle, FileCode } from "lucide-react";
 import { useEffect, useRef } from "react";
 
 /**
  * Audit page for submitting code audits and monitoring agent progress.
  */
 export default function AuditPage() {
-    const { status, stages, logs, startAudit, reset } = useAudit();
+    const { status, stages, logs, currentFile, currentAgent, startAudit, reset } = useAudit();
     const prevStatusRef = useRef(status);
 
     useEffect(() => {
@@ -61,11 +61,26 @@ export default function AuditPage() {
                 {/* Audit form */}
                 <AuditForm onSubmit={handleSubmit} isRunning={status === "running"} />
 
+                {/* Current file indicator */}
+                {currentFile && (
+                    <div className="flex items-center gap-3 rounded-lg bg-primary/5 border border-primary/20 px-4 py-3 animate-fade-in">
+                        <FileCode className="h-4 w-4 text-primary animate-pulse" />
+                        <span className="text-sm text-foreground">
+                            Processing:{" "}
+                            <span className="font-mono font-medium text-primary">
+                                {currentFile}
+                            </span>
+                        </span>
+                    </div>
+                )}
+
                 {/* Progress indicator */}
                 {status !== "idle" && <ProgressIndicator stages={stages} />}
 
                 {/* Agent activity log */}
-                {status !== "idle" && <AgentActivityLog logs={logs} />}
+                {status !== "idle" && (
+                    <AgentActivityLog logs={logs} activeAgent={currentAgent} />
+                )}
             </div>
         </div>
     );

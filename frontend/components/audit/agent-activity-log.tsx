@@ -11,6 +11,8 @@ import { Terminal } from "lucide-react";
 interface AgentActivityLogProps {
     /** Array of agent log entries to display. */
     logs: AgentLog[];
+    /** Name of the currently active agent (highlighted). */
+    activeAgent?: string | null;
 }
 
 /** Maps agent names to CSS color classes. */
@@ -25,10 +27,11 @@ const agentColorMap: Record<string, string> = {
 /**
  * Terminal-style log panel showing agent activity in real-time.
  * Auto-scrolls to the bottom as new logs arrive.
+ * Highlights the currently active agent with a glow effect.
  *
- * @param props - Log data.
+ * @param props - Log data and active agent name.
  */
-export function AgentActivityLog({ logs }: AgentActivityLogProps) {
+export function AgentActivityLog({ logs, activeAgent }: AgentActivityLogProps) {
     const scrollRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -39,7 +42,7 @@ export function AgentActivityLog({ logs }: AgentActivityLogProps) {
 
     return (
         <div className="glass-card rounded-xl p-6 border-slate-700/50 hover:border-slate-600/50 transition-colors duration-300">
-            {/* Card header - stacked layout */}
+            {/* Card header */}
             <div className="flex flex-col gap-3 mb-4">
                 <div className="flex items-center gap-2.5">
                     <div className="p-2 rounded-lg bg-slate-800 border border-white/10">
@@ -49,9 +52,17 @@ export function AgentActivityLog({ logs }: AgentActivityLogProps) {
                         Agent Activity Log
                     </h3>
                 </div>
-                <div className="flex items-center gap-2 text-sm text-green-400">
-                    <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
-                    Live Server
+                <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2 text-sm text-green-400">
+                        <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+                        Live Server
+                    </div>
+                    {activeAgent && activeAgent !== "System" && (
+                        <div className="flex items-center gap-2 text-xs text-primary font-medium animate-fade-in">
+                            <span className="w-1.5 h-1.5 bg-primary rounded-full animate-pulse" />
+                            {activeAgent}
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -64,35 +75,43 @@ export function AgentActivityLog({ logs }: AgentActivityLogProps) {
                         System ready. Waiting for audit task...
                     </p>
                 ) : (
-                    logs.map((log, index) => (
-                        <div
-                            key={log.id}
-                            className="flex gap-3 animate-fade-in break-words"
-                            style={{ animationDelay: `${index * 50}ms` }}
-                        >
-                            <span className="text-slate-500 shrink-0 select-none">
-                                [{log.timestamp}]
-                            </span>
-                            <span
+                    logs.map((log, index) => {
+                        const isActive = activeAgent === log.agent && log.agent !== "System";
+
+                        return (
+                            <div
+                                key={log.id}
                                 className={cn(
-                                    "font-semibold shrink-0 drop-shadow-sm",
-                                    agentColorMap[log.agent] ?? "text-foreground"
+                                    "flex gap-3 animate-fade-in break-words",
+                                    isActive && "bg-white/5 -mx-2 px-2 py-0.5 rounded"
                                 )}
+                                style={{ animationDelay: `${index * 30}ms` }}
                             >
-                                {log.agent}:
-                            </span>
-                            <span
-                                className={cn(
-                                    log.level === "warning" && "text-yellow-400",
-                                    log.level === "error" && "text-red-400",
-                                    log.level === "success" && "text-emerald-400",
-                                    log.level === "info" && "text-slate-300"
-                                )}
-                            >
-                                {log.message}
-                            </span>
-                        </div>
-                    ))
+                                <span className="text-slate-500 shrink-0 select-none">
+                                    [{log.timestamp}]
+                                </span>
+                                <span
+                                    className={cn(
+                                        "font-semibold shrink-0 drop-shadow-sm",
+                                        agentColorMap[log.agent] ?? "text-foreground",
+                                        isActive && "underline decoration-primary/40"
+                                    )}
+                                >
+                                    {log.agent}:
+                                </span>
+                                <span
+                                    className={cn(
+                                        log.level === "warning" && "text-yellow-400",
+                                        log.level === "error" && "text-red-400",
+                                        log.level === "success" && "text-emerald-400",
+                                        log.level === "info" && "text-slate-300"
+                                    )}
+                                >
+                                    {log.message}
+                                </span>
+                            </div>
+                        );
+                    })
                 )}
             </div>
         </div>
