@@ -41,7 +41,7 @@ export interface StreamCallbacks {
     onResult: (result: FileAuditResult) => void;
     onFileStart: (data: StreamFileEvent) => void;
     onFileDone: (data: StreamFileEvent) => void;
-    onDone: (data: { total_files: number }) => void;
+    onDone: (data: { total_files: number; duration?: number }) => void;
     onError: (error: string) => void;
 }
 

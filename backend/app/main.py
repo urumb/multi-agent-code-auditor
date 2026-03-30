@@ -59,6 +59,12 @@ def _run_audit_job(job_id: str, code_files: List[CodeFile]) -> None:
         job_id: UUID of the job.
         code_files: List of CodeFile objects to audit.
     """
+    import time
+    from backend.app.services.job_store import cleanup_old_jobs
+    
+    # Prune old jobs from memory whenever a new one starts
+    cleanup_old_jobs()
+
     job = get_job(job_id)
     if not job:
         return
@@ -66,6 +72,7 @@ def _run_audit_job(job_id: str, code_files: List[CodeFile]) -> None:
     job["status"] = "running"
     job["total_files"] = len(code_files)
     results: List[dict] = []
+    start_time = time.time()
 
     try:
         add_job_event(job_id, "log", {
@@ -92,7 +99,15 @@ def _run_audit_job(job_id: str, code_files: List[CodeFile]) -> None:
                 add_job_event(job_id, "log", {"agent": agent, "message": message, "level": level})
 
             try:
-                output = run_audit_on_code(file.content, log_callback=log_callback)
+                # Execute audit with a 30s timeout per file
+                import concurrent.futures
+                
+                def _run():
+                    return run_audit_on_code(file.content, log_callback=log_callback)
+                
+                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                    future = executor.submit(_run)
+                    output = future.result(timeout=30)
 
                 file_result = {
                     "file_path": file.path,
@@ -102,6 +117,21 @@ def _run_audit_job(job_id: str, code_files: List[CodeFile]) -> None:
                 results.append(file_result)
 
                 add_job_event(job_id, "result", file_result)
+                
+            except concurrent.futures.TimeoutError:
+                error_msg = f"Timed out after 30 seconds"
+                file_result = {
+                    "file_path": file.path,
+                    "final_report": "",
+                    "error": error_msg,
+                }
+                results.append(file_result)
+                add_job_event(job_id, "result", file_result)
+                add_job_event(job_id, "log", {
+                    "agent": "System",
+                    "message": f"Failed: {file.path} — {error_msg}",
+                    "level": "error",
+                })
 
             except Exception as exc:
                 file_result = {
@@ -124,7 +154,8 @@ def _run_audit_job(job_id: str, code_files: List[CodeFile]) -> None:
                 "total": len(code_files),
             })
 
-        add_job_event(job_id, "done", {"total_files": len(results)})
+        duration = round(time.time() - start_time, 2)
+        add_job_event(job_id, "done", {"total_files": len(results), "duration": duration})
         job["status"] = "completed"
 
     except Exception as exc:
@@ -146,14 +177,22 @@ async def _stream_job_events(job_id: str):
         return
 
     last_index = 0
+    ticks_without_event = 0
 
     while True:
         # Yield any new events
         current_events = job["events"]
+        had_events = False
         while last_index < len(current_events):
             event = current_events[last_index]
             yield f"data: {json.dumps(event)}\n\n"
             last_index += 1
+            had_events = True
+
+        if had_events:
+            ticks_without_event = 0
+        else:
+            ticks_without_event += 1
 
         # Check if complete
         if job["status"] in ("completed", "failed"):
@@ -163,6 +202,11 @@ async def _stream_job_events(job_id: str):
                 yield f"data: {json.dumps(event)}\n\n"
                 last_index += 1
             break
+
+        # Yield a heartbeat every ~2 seconds (4 * 0.5s checks)
+        if ticks_without_event >= 4:
+            yield f"data: {json.dumps({'type': 'heartbeat'})}\n\n"
+            ticks_without_event = 0
 
         # Sleep briefly to avoid hot loop
         await asyncio.sleep(0.5)

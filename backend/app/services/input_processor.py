@@ -36,6 +36,13 @@ def process_github_repo(url: str) -> List[CodeFile]:
     Raises:
         HTTPException: If git clone fails or no code files are found.
     """
+    if not url.startswith("https://github.com/"):
+        logger.error("Invalid GitHub URL attempted: %s", url)
+        raise HTTPException(
+            status_code=400,
+            detail="Only valid https://github.com/ URLs are supported.",
+        )
+
     tmp_dir = tempfile.mkdtemp(prefix="auditor_")
     try:
         logger.info("Cloning repository: %s", url)
@@ -103,14 +110,22 @@ async def process_uploaded_files(files: List[UploadFile]) -> List[CodeFile]:
         List of CodeFile objects.
 
     Raises:
-        HTTPException: If file reading fails.
+        HTTPException: If file reading fails or file is > 1MB.
     """
     code_files: List[CodeFile] = []
     try:
         for upload in files:
             raw_bytes = await upload.read()
+            if len(raw_bytes) > 1_000_000:
+                logger.error("File exceeds 1MB limit: %s", upload.filename)
+                raise HTTPException(status_code=400, detail=f"{upload.filename} exceeds 1MB limit.")
+
             content = raw_bytes.decode("utf-8", errors="ignore")
-            file_name = upload.filename or "unnamed_file"
+            # Sanitize filename to prevent absolute math or ../ traversal
+            file_name = os.path.basename(upload.filename) if upload.filename else "unnamed_file"
+            if not file_name:
+                file_name = "unnamed_file"
+
             code_files.append(CodeFile(path=file_name, content=content))
             logger.info("Processed uploaded file: %s", file_name)
 

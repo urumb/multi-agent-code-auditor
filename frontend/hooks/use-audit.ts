@@ -43,6 +43,7 @@ interface UseAuditReturn {
     error: string | null;
     currentFile: string | null;
     currentAgent: string | null;
+    duration: number | null;
     startAudit: (input: AuditInput) => Promise<void>;
     reset: () => void;
 }
@@ -65,6 +66,7 @@ export function useAudit(): UseAuditReturn {
     const [error, setError] = useState<string | null>(null);
     const [currentFile, setCurrentFile] = useState<string | null>(null);
     const [currentAgent, setCurrentAgent] = useState<string | null>(null);
+    const [duration, setDuration] = useState<number | null>(null);
     const resultsRef = useRef<FileAuditResult[]>([]);
 
     // ------------------------------------------------------------------
@@ -127,7 +129,6 @@ export function useAudit(): UseAuditReturn {
                 },
                 onFileDone: () => {},
                 onResult: (fileResult: FileAuditResult) => {
-                    // Update results array without duplicates (in case of reconnects)
                     if (!resultsRef.current.find(r => r.file_path === fileResult.file_path)) {
                         resultsRef.current = [...resultsRef.current, fileResult];
                         const statusIcon = fileResult.error ? "✗" : "✓";
@@ -138,7 +139,7 @@ export function useAudit(): UseAuditReturn {
                         );
                     }
                 },
-                onDone: (data: { total_files: number }) => {
+                onDone: (data: { total_files: number; duration?: number }) => {
                     const finalResult: AuditResultResponse = {
                         total_files: data.total_files,
                         results: resultsRef.current,
@@ -149,14 +150,14 @@ export function useAudit(): UseAuditReturn {
                     setStatus("completed");
                     setCurrentFile(null);
                     setCurrentAgent(null);
+                    setDuration(data.duration ?? null);
 
                     localStorage.setItem("latestAuditResult", JSON.stringify(finalResult));
                     localStorage.removeItem(JOB_STORAGE_KEY);
 
-                    addLog("System", `✓ Audit complete — ${data.total_files} file(s) processed`, "success");
+                    addLog("System", `✓ Audit complete — ${data.total_files} file(s) processed in ${data.duration ? data.duration + 's' : 'unknown time'}`, "success");
                 },
                 onError: (errorMsg: string) => {
-                    // Ignore "Job not found" if we reloaded the page long after it finished
                     if (errorMsg.includes("Job not found")) {
                         localStorage.removeItem(JOB_STORAGE_KEY);
                         setStatus("idle");
@@ -182,7 +183,6 @@ export function useAudit(): UseAuditReturn {
     // ------------------------------------------------------------------
     // Background Job Persistence Lifecycle
     // ------------------------------------------------------------------
-    // Mount: Check if a job is already running
     useEffect(() => {
         const storedJobId = localStorage.getItem(JOB_STORAGE_KEY);
         if (storedJobId && status === "idle") {
@@ -281,5 +281,5 @@ export function useAudit(): UseAuditReturn {
         localStorage.removeItem(JOB_STORAGE_KEY);
     }, []);
 
-    return { status, stages, logs, result, error, currentFile, currentAgent, startAudit, reset };
+    return { status, stages, logs, result, error, currentFile, currentAgent, duration, startAudit, reset };
 }
