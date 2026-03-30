@@ -5,19 +5,23 @@ __pycache__/
 venv/
 env/
 
-# Build & Distribution
-build/
-dist/
-*.egg-info/
-
 # Environment Variables
 .env
 
 # Local Data & Models
-local_models/
 chroma_db/
+chroma/
+*.sqlite3
+local_models/
 
-# System Files
+# Frontend & JS
+node_modules/
+.next/
+
+# Build & System
+build/
+dist/
+*.egg-info/
 .DS_Store
 Thumbs.db
 
@@ -29,6 +33,7 @@ Thumbs.db
 
 # Logs, Reports & Testing
 *.log
+error.log
 *.audit_report.md
 .pytest_cache/
 .coverage
