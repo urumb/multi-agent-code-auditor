@@ -13,34 +13,29 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 /*  Types matching the backend responses                                */
 /* ------------------------------------------------------------------ */
 
-/** A single file's audit result from the backend. */
 export interface FileAuditResult {
     file_path: string;
     final_report: string;
     error: string | null;
 }
 
-/** Aggregated audit response from the backend. */
 export interface AuditResultResponse {
     total_files: number;
     results: FileAuditResult[];
 }
 
-/** A real-time log event from the SSE stream. */
 export interface StreamLogEvent {
     agent: string;
     message: string;
     level: "info" | "warning" | "error" | "success";
 }
 
-/** File progress event from the SSE stream. */
 export interface StreamFileEvent {
     path: string;
     index: number;
     total: number;
 }
 
-/** Callbacks for the SSE stream consumer. */
 export interface StreamCallbacks {
     onLog: (log: StreamLogEvent) => void;
     onResult: (result: FileAuditResult) => void;
@@ -54,14 +49,6 @@ export interface StreamCallbacks {
 /*  Core fetch helper                                                  */
 /* ------------------------------------------------------------------ */
 
-/**
- * Performs a fetch request against the backend API.
- *
- * @param endpoint - API endpoint path (e.g. "/audit").
- * @param options  - Optional fetch init configuration.
- * @returns The parsed JSON response.
- * @throws Error on non-2xx responses.
- */
 async function apiFetch<T>(endpoint: string, options?: RequestInit): Promise<T> {
     const response = await fetch(`${API_BASE}${endpoint}`, {
         ...options,
@@ -76,25 +63,16 @@ async function apiFetch<T>(endpoint: string, options?: RequestInit): Promise<T> 
 }
 
 /* ------------------------------------------------------------------ */
-/*  Streaming audit (SSE via POST)                                     */
+/*  Background streaming audit (SSE via Job Queue)                     */
 /* ------------------------------------------------------------------ */
 
 /**
- * Streams a code audit via Server-Sent Events.
- *
- * Sends a POST to /audit/stream and reads the response body as a
- * ReadableStream, parsing structured JSON events and dispatching
- * to callbacks.
- *
- * Event format: ``data: {"type":"log|result|file_start|file_done|done|error","data":{...}}``
+ * Starts a code audit in the background and returns a job_id.
  *
  * @param input - Audit input from the frontend form.
- * @param callbacks - Event handlers for each event type.
+ * @returns Object containing the background job_id.
  */
-export async function streamAudit(
-    input: AuditInput,
-    callbacks: StreamCallbacks,
-): Promise<void> {
+export async function startAuditJob(input: AuditInput): Promise<{ job_id: string }> {
     const body: Record<string, string> = {
         input_type: input.mode,
     };
@@ -105,20 +83,43 @@ export async function streamAudit(
         body.code = input.code;
     }
 
+    return apiFetch<{ job_id: string }>("/audit/stream", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+    });
+}
+
+/**
+ * Subscribes to a background code audit via Server-Sent Events.
+ *
+ * Calls GET /audit/stream/{job_id} and reads the response body as a
+ * ReadableStream, parsing structured JSON events and dispatching
+ * to callbacks.
+ *
+ * @param jobId - UUID of the running audit job.
+ * @param callbacks - Event handlers for each event type.
+ */
+export async function subscribeToAuditJob(
+    jobId: string,
+    callbacks: StreamCallbacks,
+): Promise<void> {
     let response: Response;
     try {
-        response = await fetch(`${API_BASE}/audit/stream`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(body),
+        response = await fetch(`${API_BASE}/audit/stream/${jobId}`, {
+            method: "GET",
         });
     } catch {
-        callbacks.onError("Failed to connect to backend");
+        callbacks.onError("Failed to connect to backend stream");
         return;
     }
 
     if (!response.ok) {
-        callbacks.onError(`Backend error: ${response.status} ${response.statusText}`);
+        if (response.status === 404) {
+            callbacks.onError("Job not found or expired");
+        } else {
+            callbacks.onError(`Backend error: ${response.status} ${response.statusText}`);
+        }
         return;
     }
 
@@ -138,7 +139,6 @@ export async function streamAudit(
 
             buffer += decoder.decode(value, { stream: true });
 
-            // Process complete SSE lines (each ends with \n\n)
             const lines = buffer.split("\n\n");
             buffer = lines.pop() ?? "";
 
@@ -187,12 +187,6 @@ export async function streamAudit(
 /*  Non-streaming fallback                                             */
 /* ------------------------------------------------------------------ */
 
-/**
- * Submits a code audit request (non-streaming fallback).
- *
- * @param input - Audit input from the frontend form.
- * @returns The backend's AuditResultResponse.
- */
 export async function submitAudit(input: AuditInput): Promise<AuditResultResponse> {
     if (input.mode === "upload" && input.files && input.files.length > 0) {
         const formData = new FormData();
@@ -221,10 +215,6 @@ export async function submitAudit(input: AuditInput): Promise<AuditResultRespons
         body: JSON.stringify(body),
     });
 }
-
-/* ------------------------------------------------------------------ */
-/*  Dashboard endpoints (no backend support yet — return empty)        */
-/* ------------------------------------------------------------------ */
 
 export async function fetchMetrics(): Promise<MetricData[]> {
     return [];

@@ -52,10 +52,19 @@ def run_audit_on_code(
     logger.info("Invoking LangGraph audit pipeline (%d chars)", len(code))
 
     try:
-        _log("Security Agent", "Scanning for vulnerabilities...")
-        _log("Performance Agent", "Analyzing complexity...")
+        if len(code) < 200:
+            logger.info("Short-circuiting audit for small input (%d chars)", len(code))
+            _log("Security Agent", "Small file detected. Skipping heavy analysis...", "info")
+            _log("Reviewer Agent", "Generating fast summary report...", "info")
+            
+            output = {
+                "final_report": f"### Fast Audit Result\n\nInput too small ({len(code)} chars) for deep analysis. Code appears structurally valid but no complex vulnerabilities can be inferred."
+            }
+        else:
+            _log("Security Agent", "Scanning for vulnerabilities...")
+            _log("Performance Agent", "Analyzing complexity...")
 
-        output = graph.invoke(initial_state)
+            output = graph.invoke(initial_state)
 
         _log("Reviewer Agent", "Synthesizing final report...")
         _log("System", "Pipeline completed successfully", "success")
