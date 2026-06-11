@@ -39,7 +39,7 @@ graph TD
 **Backend**
 - Python 3.12+
 - FastAPI (Async endpoints & BackgroundTasks)
-- LangGraph (Agent Orchestration)
+- LangGraph (Agent Orchestestrator)
 - ChromaDB (Vector Store)
 
 **Frontend**
@@ -55,7 +55,6 @@ graph TD
 ## ⚡ Real-Time Streaming
 
 The system leverages Server-Sent Events (SSE) to deliver real-time agent activity logs and asynchronous incremental results to the frontend.
-
 **Example Event Stream:**
 ```json
 data: {
