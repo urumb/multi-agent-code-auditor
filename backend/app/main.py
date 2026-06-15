@@ -98,12 +98,20 @@ def _run_audit_job(job_id: str, code_files: List[CodeFile]) -> None:
             def log_callback(agent: str, message: str, level: str = "info") -> None:
                 add_job_event(job_id, "log", {"agent": agent, "message": message, "level": level})
 
+            def event_callback(event_type: str, payload: dict) -> None:
+                add_job_event(job_id, event_type, payload)
+
             try:
                 # Execute audit with a 30s timeout per file
                 import concurrent.futures
                 
                 def _run():
-                    return run_audit_on_code(file.content, log_callback=log_callback)
+                    return run_audit_on_code(
+                        file.content,
+                        log_callback=log_callback,
+                        event_callback=event_callback,
+                        repository_file_count=len(code_files),
+                    )
                 
                 with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
                     future = executor.submit(_run)
@@ -231,7 +239,7 @@ def _run_audit_on_files(code_files: List[CodeFile]) -> AuditResultResponse:
     for file in code_files:
         logger.info("[AUDIT] Processing: %s", file.path)
         try:
-            output = run_audit_on_code(file.content)
+            output = run_audit_on_code(file.content, repository_file_count=len(code_files))
             results.append(FileAuditResult(
                 file_path=file.path,
                 final_report=output.get("final_report", ""),

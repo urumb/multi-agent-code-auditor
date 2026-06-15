@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState, useEffect } from "react";
+import { useCallback, useMemo } from "react";
 import {
     ReactFlow,
     Background,
@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 import { Shield, Gauge, Code, Bot, Crown } from "lucide-react";
 
 /** Node states for styling */
-type NodeState = "idle" | "running" | "completed" | "error";
+type NodeState = "idle" | "running" | "completed" | "failed";
 
 /**
  * Props for the custom agent node component.
@@ -58,7 +58,7 @@ function AgentNodeComponent({ data }: { data: AgentNodeData }) {
                 state === "idle" && "border-slate-700 opacity-80",
                 state === "running" && "border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.5)] scale-105 bg-[#1e293b]",
                 state === "completed" && "border-emerald-500",
-                state === "error" && "border-red-500"
+                state === "failed" && "border-red-500"
             )}
         >
             <Handle
@@ -73,7 +73,7 @@ function AgentNodeComponent({ data }: { data: AgentNodeData }) {
                         state === "idle" && "bg-slate-800 border-slate-700",
                         state === "running" && "bg-blue-500/20 border-blue-500/50",
                         state === "completed" && "bg-emerald-500/20 border-emerald-500/50",
-                        state === "error" && "bg-red-500/20 border-red-500/50"
+                        state === "failed" && "bg-red-500/20 border-red-500/50"
                     )}
                 >
                     <IconComp
@@ -82,7 +82,7 @@ function AgentNodeComponent({ data }: { data: AgentNodeData }) {
                             state === "idle" && "text-slate-400",
                             state === "running" && "text-blue-400 animate-pulse",
                             state === "completed" && "text-emerald-400",
-                            state === "error" && "text-red-400"
+                            state === "failed" && "text-red-400"
                         )}
                     />
                 </div>
@@ -96,7 +96,7 @@ function AgentNodeComponent({ data }: { data: AgentNodeData }) {
                             state === "idle" && "text-slate-500",
                             state === "running" && "text-blue-400",
                             state === "completed" && "text-emerald-400",
-                            state === "error" && "text-red-400"
+                            state === "failed" && "text-red-400"
                         )}
                     >
                         {state === "idle" && data.type}
@@ -202,27 +202,29 @@ const edges: Edge[] = [
  * Interactive agent collaboration graph using React Flow.
  * Displays the multi-agent pipeline: Manager → Analyzers → Reviewer.
  */
-export function AgentGraph() {
-    // We'll simulate some state changes just for visual flair if needed,
-    // but in a real app this would be driven by props.
-    const [nodes, setNodes] = useState(initialNodes);
+interface AgentGraphProps {
+    nodeStates?: Partial<Record<string, NodeState>>;
+}
 
-    useEffect(() => {
-        // Simulate a running state sequence to demonstrate the visual upgrades
-        const timer1 = setTimeout(() => {
-            setNodes((nds) => nds.map((n) => (n.id === "manager" ? { ...n, data: { ...n.data, state: "completed" } } : n)));
-            setNodes((nds) => nds.map((n) => (n.type === "agent" && n.id !== "manager" && n.id !== "reviewer" ? { ...n, data: { ...n.data, state: "running" } } : n)));
-        }, 1500);
-
-        return () => clearTimeout(timer1);
-    }, []);
+export function AgentGraph({ nodeStates = {} }: AgentGraphProps) {
+    const nodes = useMemo(
+        () =>
+            initialNodes.map((node) => ({
+                ...node,
+                data: {
+                    ...node.data,
+                    state: nodeStates[node.id] ?? "idle",
+                },
+            })),
+        [nodeStates]
+    );
 
     const onInit = useCallback(() => {
         // Graph initialized
     }, []);
 
     return (
-        <div className="h-[600px] w-full rounded-xl overflow-hidden border border-slate-800 bg-[#020617] shadow-inner">
+        <div className="h-full min-h-[360px] w-full rounded-xl overflow-hidden border border-slate-800 bg-[#020617] shadow-inner">
             <ReactFlow
                 nodes={nodes}
                 edges={edges}

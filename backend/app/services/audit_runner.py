@@ -9,11 +9,14 @@ logger = logging.getLogger(__name__)
 
 # Type alias for the optional log callback.
 LogCallback = Optional[Callable[[str, str, str], None]]
+EventCallback = Optional[Callable[[str, Dict[str, Any]], None]]
 
 
 def run_audit_on_code(
     code: str,
     log_callback: LogCallback = None,
+    event_callback: EventCallback = None,
+    repository_file_count: int = 1,
 ) -> Dict[str, Any]:
     """Run the full LangGraph audit pipeline on a single code string.
 
@@ -24,6 +27,9 @@ def run_audit_on_code(
         code: Raw source code content to audit.
         log_callback: Optional callback ``(agent, message, level)`` invoked
             at each major pipeline step to emit real-time progress events.
+        event_callback: Optional callback ``(event_type, payload)`` invoked
+            for structured SSE lifecycle events.
+        repository_file_count: Number of files in the original input batch.
 
     Returns:
         Full AuditorState dict after graph execution, including
@@ -41,7 +47,10 @@ def run_audit_on_code(
 
     initial_state = {
         "original_code": code,
+        "repository_file_count": repository_file_count,
         "code_snippets": [],
+        "execution_plan": {},
+        "event_callback": event_callback,
         "security_analysis": [],
         "performance_analysis": [],
         "past_audits": [],
@@ -52,21 +61,12 @@ def run_audit_on_code(
     logger.info("Invoking LangGraph audit pipeline (%d chars)", len(code))
 
     try:
-        if len(code) < 200:
-            logger.info("Short-circuiting audit for small input (%d chars)", len(code))
-            _log("Security Agent", "Small file detected. Skipping heavy analysis...", "info")
-            _log("Reviewer Agent", "Generating fast summary report...", "info")
-            
-            output = {
-                "final_report": f"### Fast Audit Result\n\nInput too small ({len(code)} chars) for deep analysis. Code appears structurally valid but no complex vulnerabilities can be inferred."
-            }
-        else:
-            _log("Security Agent", "Scanning for vulnerabilities...")
-            _log("Performance Agent", "Analyzing complexity...")
+        output = graph.invoke(initial_state)
+        output.pop("event_callback", None)
 
-            output = graph.invoke(initial_state)
-
-        _log("Reviewer Agent", "Synthesizing final report...")
+        planned_agents = (output.get("execution_plan") or {}).get("agents", [])
+        if "reviewer" in planned_agents:
+            _log("Reviewer Agent", "Synthesizing final report...")
         _log("System", "Pipeline completed successfully", "success")
         logger.info("Audit pipeline completed successfully")
         return output

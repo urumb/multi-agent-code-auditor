@@ -1,6 +1,6 @@
 # Author: urumb
 import ast
-from typing import List
+from typing import Dict, List
 from ..state import AuditorState
 
 class ManagerAgent:
@@ -40,13 +40,39 @@ class ManagerAgent:
             # Not valid python or other language
             return [code]
 
+    def build_execution_plan(self, code: str, repository_file_count: int = 1) -> Dict[str, object]:
+        """
+        Chooses the minimum useful agent set for the submitted input.
+        """
+        if len(code) < 200:
+            return {
+                "agents": ["security"],
+                "reason": "Small snippet",
+            }
+
+        if repository_file_count > 1 or len(code) >= 5000:
+            return {
+                "agents": ["security", "performance", "reviewer"],
+                "reason": "Large repository input",
+            }
+
+        return {
+            "agents": ["security", "performance", "reviewer"],
+            "reason": "Medium-sized input",
+        }
+
     def run(self, state: AuditorState) -> AuditorState:
         """
         Orchestrates decomposition.
         """
         print("--- Manager Agent: Decomposing Code ---")
         original_code = state.get("original_code", "")
+        repository_file_count = state.get("repository_file_count") or 1
         snippets = self.split_code(original_code)
+        execution_plan = self.build_execution_plan(original_code, repository_file_count)
         
         # Update state
-        return {"code_snippets": snippets}
+        return {
+            "code_snippets": snippets,
+            "execution_plan": execution_plan,
+        }

@@ -15,6 +15,8 @@ import {
     type FileAuditResult,
     type StreamLogEvent,
     type StreamFileEvent,
+    type ExecutionPlan,
+    type AgentLifecycleEvent,
 } from "@/lib/api";
 
 const MAX_LOGS = 100;
@@ -35,6 +37,24 @@ const AGENT_STAGE_MAP: Record<string, number> = {
     "Reviewer Agent": 4,
 };
 
+export type AgentGraphNodeState = "idle" | "running" | "completed" | "failed";
+
+const INITIAL_AGENT_GRAPH_STATES: Record<string, AgentGraphNodeState> = {
+    manager: "idle",
+    security: "idle",
+    performance: "idle",
+    "code-quality": "idle",
+    reviewer: "idle",
+};
+
+const AGENT_NODE_ID_MAP: Record<string, string> = {
+    "Manager Agent": "manager",
+    "Security Agent": "security",
+    "Performance Agent": "performance",
+    "Code Quality Agent": "code-quality",
+    "Reviewer Agent": "reviewer",
+};
+
 interface UseAuditReturn {
     status: AuditStatus;
     stages: AuditStage[];
@@ -44,6 +64,8 @@ interface UseAuditReturn {
     currentFile: string | null;
     currentAgent: string | null;
     duration: number | null;
+    executionPlan: ExecutionPlan | null;
+    agentGraphStates: Record<string, AgentGraphNodeState>;
     startAudit: (input: AuditInput) => Promise<void>;
     reset: () => void;
 }
@@ -67,6 +89,9 @@ export function useAudit(): UseAuditReturn {
     const [currentFile, setCurrentFile] = useState<string | null>(null);
     const [currentAgent, setCurrentAgent] = useState<string | null>(null);
     const [duration, setDuration] = useState<number | null>(null);
+    const [executionPlan, setExecutionPlan] = useState<ExecutionPlan | null>(null);
+    const [agentGraphStates, setAgentGraphStates] =
+        useState<Record<string, AgentGraphNodeState>>(INITIAL_AGENT_GRAPH_STATES);
     const resultsRef = useRef<FileAuditResult[]>([]);
 
     // ------------------------------------------------------------------
@@ -109,6 +134,12 @@ export function useAudit(): UseAuditReturn {
         []
     );
 
+    const setAgentNodeState = useCallback((agent: string, nodeState: AgentGraphNodeState) => {
+        const nodeId = AGENT_NODE_ID_MAP[agent];
+        if (!nodeId) return;
+        setAgentGraphStates((prev) => ({ ...prev, [nodeId]: nodeState }));
+    }, []);
+
     // ------------------------------------------------------------------
     // Setup Subscription Handlers
     // ------------------------------------------------------------------
@@ -128,6 +159,21 @@ export function useAudit(): UseAuditReturn {
                     updateStage(2, "running");
                 },
                 onFileDone: () => {},
+                onExecutionPlan: (plan: ExecutionPlan) => {
+                    setExecutionPlan(plan);
+                    addLog("Manager Agent", `Execution plan: ${plan.reason} (${plan.agents.join(", ")})`, "info");
+                },
+                onAgentStarted: (data: AgentLifecycleEvent) => {
+                    setAgentNodeState(data.agent, "running");
+                    const stageId = AGENT_STAGE_MAP[data.agent];
+                    if (stageId) activateStage(stageId);
+                },
+                onAgentCompleted: (data: AgentLifecycleEvent) => {
+                    setAgentNodeState(data.agent, "completed");
+                },
+                onAgentFailed: (data: AgentLifecycleEvent) => {
+                    setAgentNodeState(data.agent, "failed");
+                },
                 onResult: (fileResult: FileAuditResult) => {
                     if (!resultsRef.current.find(r => r.file_path === fileResult.file_path)) {
                         resultsRef.current = [...resultsRef.current, fileResult];
@@ -177,7 +223,7 @@ export function useAudit(): UseAuditReturn {
                 },
             });
         },
-        [addLog, updateStage, activateStage]
+        [addLog, updateStage, activateStage, setAgentNodeState]
     );
 
     // ------------------------------------------------------------------
@@ -186,8 +232,10 @@ export function useAudit(): UseAuditReturn {
     useEffect(() => {
         const storedJobId = localStorage.getItem(JOB_STORAGE_KEY);
         if (storedJobId && status === "idle") {
-            addLog("System", "Reconnecting to active background audit...", "info");
-            _handleSubscription(storedJobId);
+            window.setTimeout(() => {
+                addLog("System", "Reconnecting to active background audit...", "info");
+                _handleSubscription(storedJobId);
+            }, 0);
         }
     }, [status, _handleSubscription, addLog]);
 
@@ -199,6 +247,8 @@ export function useAudit(): UseAuditReturn {
             setResult(null);
             setCurrentFile(null);
             setCurrentAgent(null);
+            setExecutionPlan(null);
+            setAgentGraphStates(INITIAL_AGENT_GRAPH_STATES);
             resultsRef.current = [];
             setStages(AUDIT_STAGES.map((s) => ({ ...s, status: "pending" as const })));
 
@@ -230,6 +280,8 @@ export function useAudit(): UseAuditReturn {
             setResult(null);
             setCurrentFile(null);
             setCurrentAgent(null);
+            setExecutionPlan(null);
+            setAgentGraphStates(INITIAL_AGENT_GRAPH_STATES);
             setStages(AUDIT_STAGES.map((s) => ({ ...s, status: "pending" as const })));
 
             updateStage(1, "running");
@@ -277,9 +329,24 @@ export function useAudit(): UseAuditReturn {
         setError(null);
         setCurrentFile(null);
         setCurrentAgent(null);
+        setExecutionPlan(null);
+        setAgentGraphStates(INITIAL_AGENT_GRAPH_STATES);
         resultsRef.current = [];
         localStorage.removeItem(JOB_STORAGE_KEY);
     }, []);
 
-    return { status, stages, logs, result, error, currentFile, currentAgent, duration, startAudit, reset };
+    return {
+        status,
+        stages,
+        logs,
+        result,
+        error,
+        currentFile,
+        currentAgent,
+        duration,
+        executionPlan,
+        agentGraphStates,
+        startAudit,
+        reset,
+    };
 }

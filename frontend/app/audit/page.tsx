@@ -3,6 +3,7 @@
 import { AuditForm } from "@/components/audit/audit-form";
 import { ProgressIndicator } from "@/components/audit/progress-indicator";
 import { AgentActivityLog } from "@/components/audit/agent-activity-log";
+import { AgentGraph } from "@/components/agents/agent-graph";
 import { useAudit } from "@/hooks/use-audit";
 import { toast } from "sonner";
 import { CheckCircle, XCircle, FileCode } from "lucide-react";
@@ -12,7 +13,18 @@ import { useEffect, useRef } from "react";
  * Audit page for submitting code audits and monitoring agent progress.
  */
 export default function AuditPage() {
-    const { status, stages, logs, currentFile, currentAgent, result, duration, startAudit, reset } = useAudit();
+    const {
+        status,
+        stages,
+        logs,
+        currentFile,
+        currentAgent,
+        result,
+        duration,
+        agentGraphStates,
+        startAudit,
+        reset,
+    } = useAudit();
     const prevStatusRef = useRef(status);
 
     useEffect(() => {
@@ -104,6 +116,12 @@ export default function AuditPage() {
                                 Completed in {duration}s
                             </div>
                         )}
+                    </div>
+                )}
+
+                {status !== "idle" && (
+                    <div className="w-full h-[420px] bg-white/5 backdrop-blur-lg border border-white/10 rounded-xl p-4">
+                        <AgentGraph nodeStates={agentGraphStates} />
                     </div>
                 )}
 

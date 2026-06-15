@@ -36,11 +36,24 @@ export interface StreamFileEvent {
     total: number;
 }
 
+export interface ExecutionPlan {
+    agents: string[];
+    reason: string;
+}
+
+export interface AgentLifecycleEvent {
+    agent: string;
+}
+
 export interface StreamCallbacks {
     onLog: (log: StreamLogEvent) => void;
     onResult: (result: FileAuditResult) => void;
     onFileStart: (data: StreamFileEvent) => void;
     onFileDone: (data: StreamFileEvent) => void;
+    onExecutionPlan: (data: ExecutionPlan) => void;
+    onAgentStarted: (data: AgentLifecycleEvent) => void;
+    onAgentCompleted: (data: AgentLifecycleEvent) => void;
+    onAgentFailed: (data: AgentLifecycleEvent) => void;
     onDone: (data: { total_files: number; duration?: number }) => void;
     onError: (error: string) => void;
 }
@@ -163,6 +176,18 @@ export async function subscribeToAuditJob(
                             break;
                         case "file_done":
                             callbacks.onFileDone(event.data as StreamFileEvent);
+                            break;
+                        case "execution_plan":
+                            callbacks.onExecutionPlan(event.data as ExecutionPlan);
+                            break;
+                        case "agent_started":
+                            callbacks.onAgentStarted(event.data as AgentLifecycleEvent);
+                            break;
+                        case "agent_completed":
+                            callbacks.onAgentCompleted(event.data as AgentLifecycleEvent);
+                            break;
+                        case "agent_failed":
+                            callbacks.onAgentFailed(event.data as AgentLifecycleEvent);
                             break;
                         case "done":
                             callbacks.onDone(event.data as { total_files: number });
