@@ -64,7 +64,6 @@ interface UseAuditReturn {
     currentFile: string | null;
     currentAgent: string | null;
     duration: number | null;
-    executionPlan: ExecutionPlan | null;
     agentGraphStates: Record<string, AgentGraphNodeState>;
     startAudit: (input: AuditInput) => Promise<void>;
     reset: () => void;
@@ -89,7 +88,6 @@ export function useAudit(): UseAuditReturn {
     const [currentFile, setCurrentFile] = useState<string | null>(null);
     const [currentAgent, setCurrentAgent] = useState<string | null>(null);
     const [duration, setDuration] = useState<number | null>(null);
-    const [executionPlan, setExecutionPlan] = useState<ExecutionPlan | null>(null);
     const [agentGraphStates, setAgentGraphStates] =
         useState<Record<string, AgentGraphNodeState>>(INITIAL_AGENT_GRAPH_STATES);
     const resultsRef = useRef<FileAuditResult[]>([]);
@@ -160,7 +158,6 @@ export function useAudit(): UseAuditReturn {
                 },
                 onFileDone: () => {},
                 onExecutionPlan: (plan: ExecutionPlan) => {
-                    setExecutionPlan(plan);
                     addLog("Manager Agent", `Execution plan: ${plan.reason} (${plan.agents.join(", ")})`, "info");
                 },
                 onAgentStarted: (data: AgentLifecycleEvent) => {
@@ -247,7 +244,6 @@ export function useAudit(): UseAuditReturn {
             setResult(null);
             setCurrentFile(null);
             setCurrentAgent(null);
-            setExecutionPlan(null);
             setAgentGraphStates(INITIAL_AGENT_GRAPH_STATES);
             resultsRef.current = [];
             setStages(AUDIT_STAGES.map((s) => ({ ...s, status: "pending" as const })));
@@ -280,7 +276,6 @@ export function useAudit(): UseAuditReturn {
             setResult(null);
             setCurrentFile(null);
             setCurrentAgent(null);
-            setExecutionPlan(null);
             setAgentGraphStates(INITIAL_AGENT_GRAPH_STATES);
             setStages(AUDIT_STAGES.map((s) => ({ ...s, status: "pending" as const })));
 
@@ -329,7 +324,6 @@ export function useAudit(): UseAuditReturn {
         setError(null);
         setCurrentFile(null);
         setCurrentAgent(null);
-        setExecutionPlan(null);
         setAgentGraphStates(INITIAL_AGENT_GRAPH_STATES);
         resultsRef.current = [];
         localStorage.removeItem(JOB_STORAGE_KEY);
@@ -344,7 +338,6 @@ export function useAudit(): UseAuditReturn {
         currentFile,
         currentAgent,
         duration,
-        executionPlan,
         agentGraphStates,
         startAudit,
         reset,
