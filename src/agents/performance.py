@@ -2,6 +2,7 @@
 from langchain_ollama import ChatOllama
 from langchain_core.prompts import ChatPromptTemplate
 from ..config import Config
+from ..findings import normalize_findings
 from ..state import AuditorState
 
 class PerformanceAgent:
@@ -12,7 +13,24 @@ class PerformanceAgent:
             temperature=0.2
         )
         self.prompt = ChatPromptTemplate.from_messages([
-            ("system", "You are a Senior Performance Engineer. Analyze the code for inefficiencies (Big-O complexity, memory leaks, redundant computations). Suggest optimizations."),
+            ("system", """You are a Senior Performance Engineer. Analyze the code for inefficient algorithms, unnecessary repeated work, avoidable I/O, memory pressure, blocking operations, and scalability risks.
+
+Return only valid JSON with this exact shape:
+{
+  "findings": [
+    {
+      "severity": "Critical|High|Medium|Low",
+      "issue": "short actionable title",
+      "explanation": "why this affects runtime, memory, or scalability",
+      "suggested_fix": "specific developer guidance",
+      "before_code": "relevant inefficient code",
+      "after_code": "optimized replacement code",
+      "cwe": ""
+    }
+  ]
+}
+
+If there are no findings, return {"findings": []}."""),
             ("user", "Code Snippet:\n{code}")
         ])
 
@@ -28,12 +46,14 @@ class PerformanceAgent:
                 response = chain.invoke({"code": snippet})
                 results.append({
                     "snippet_index": i,
-                    "analysis": response.content
+                    "analysis": response.content,
+                    "findings": normalize_findings(response.content, "performance", snippet),
                 })
             except Exception as e:
                 results.append({
                     "snippet_index": i,
-                    "error": str(e)
+                    "error": str(e),
+                    "findings": [],
                 })
 
         return {"performance_analysis": results}

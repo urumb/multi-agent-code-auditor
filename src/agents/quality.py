@@ -1,19 +1,21 @@
 # Author: urumb
 from langchain_ollama import ChatOllama
 from langchain_core.prompts import ChatPromptTemplate
+
 from ..config import Config
 from ..findings import normalize_findings
 from ..state import AuditorState
 
-class SecurityAgent:
+
+class QualityAgent:
     def __init__(self):
         self.llm = ChatOllama(
             base_url=Config.OLLAMA_BASE_URL,
             model=Config.MODEL_NAME,
-            temperature=0.1
+            temperature=0.2
         )
         self.prompt = ChatPromptTemplate.from_messages([
-            ("system", """You are a Senior Security Engineer. Analyze the provided code snippet for security vulnerabilities including OWASP Top 10, SQL injection, XSS, unsafe deserialization, path traversal, auth bypasses, and hardcoded secrets.
+            ("system", """You are a Senior Code Quality Engineer. Analyze the code for maintainability, correctness risks, brittle abstractions, poor error handling, duplicated logic, unclear boundaries, and testability issues.
 
 Return only valid JSON with this exact shape:
 {
@@ -21,11 +23,11 @@ Return only valid JSON with this exact shape:
     {
       "severity": "Critical|High|Medium|Low",
       "issue": "short actionable title",
-      "explanation": "why this is risky in this code",
+      "explanation": "why this harms correctness or maintainability",
       "suggested_fix": "specific developer guidance",
-      "before_code": "relevant vulnerable code",
-      "after_code": "safer replacement code",
-      "cwe": "CWE identifier or empty string"
+      "before_code": "relevant problematic code",
+      "after_code": "improved replacement code",
+      "cwe": ""
     }
   ]
 }
@@ -35,7 +37,7 @@ If there are no findings, return {"findings": []}."""),
         ])
 
     def run(self, state: AuditorState) -> AuditorState:
-        print("--- Security Agent: Scanning for Vulnerabilities ---")
+        print("--- Quality Agent: Reviewing Maintainability ---")
         snippets = state.get("code_snippets", [])
         results = []
 
@@ -47,7 +49,7 @@ If there are no findings, return {"findings": []}."""),
                 results.append({
                     "snippet_index": i,
                     "analysis": response.content,
-                    "findings": normalize_findings(response.content, "security", snippet),
+                    "findings": normalize_findings(response.content, "quality", snippet),
                 })
             except Exception as e:
                 results.append({
@@ -56,4 +58,4 @@ If there are no findings, return {"findings": []}."""),
                     "findings": [],
                 })
 
-        return {"security_analysis": results}
+        return {"quality_analysis": results}
