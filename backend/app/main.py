@@ -4,6 +4,8 @@ import logging
 import asyncio
 from typing import Generator, List
 
+from pydantic import BaseModel
+
 from fastapi import FastAPI, File, UploadFile, BackgroundTasks, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
