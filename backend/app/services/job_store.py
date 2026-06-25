@@ -15,7 +15,7 @@ from typing import Any, Dict
 # }
 jobs: Dict[str, Dict[str, Any]] = {}
 
-def create_job() -> str:
+def create_job(input_identifier: str = "Unknown Input") -> str:
     """Create a new job and return its ID."""
     now = time.time()
     job_id = str(uuid.uuid4())
@@ -24,7 +24,9 @@ def create_job() -> str:
         "events": [],
         "total_files": 0,
         "created_at": now,
-        "last_updated": now
+        "last_updated": now,
+        "input_identifier": input_identifier,
+        "total_findings": 0
     }
     return job_id
 

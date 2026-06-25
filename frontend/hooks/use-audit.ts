@@ -51,7 +51,7 @@ const AGENT_NODE_ID_MAP: Record<string, string> = {
     "Manager Agent": "manager",
     "Security Agent": "security",
     "Performance Agent": "performance",
-    "Code Quality Agent": "code-quality",
+    "Quality Agent": "code-quality",
     "Reviewer Agent": "reviewer",
 };
 
@@ -231,7 +231,12 @@ export function useAudit(): UseAuditReturn {
         if (storedJobId && status === "idle") {
             window.setTimeout(() => {
                 addLog("System", "Reconnecting to active background audit...", "info");
-                _handleSubscription(storedJobId);
+                _handleSubscription(storedJobId).catch((err) => {
+                    const message = err instanceof Error ? err.message : "Failed to reconnect";
+                    addLog("System", `✗ ${message}`, "error");
+                    localStorage.removeItem(JOB_STORAGE_KEY);
+                    setStatus("idle");
+                });
             }, 0);
         }
     }, [status, _handleSubscription, addLog]);
