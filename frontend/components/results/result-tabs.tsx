@@ -41,7 +41,7 @@ export function ResultTabs({ findings }: ResultTabsProps) {
     return (
         <div>
             {/* Tab bar */}
-            <div className="flex gap-2 mb-6 overflow-x-auto pb-1">
+            <div className="flex gap-2 mb-6 overflow-x-auto pb-2 border-b border-border">
                 {tabs.map((tab) => {
                     const count = getCategoryCount(tab.category);
                     return (
@@ -50,10 +50,10 @@ export function ResultTabs({ findings }: ResultTabsProps) {
                             type="button"
                             onClick={() => setActiveTab(tab.category)}
                             className={cn(
-                                "flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-all duration-200 whitespace-nowrap",
+                                "flex items-center gap-2 px-3 py-2 text-sm font-medium transition-colors duration-200 whitespace-nowrap border-b-2 -mb-[9px]",
                                 activeTab === tab.category
-                                    ? "bg-primary/10 text-primary border border-primary/20"
-                                    : "bg-muted/30 text-muted-foreground hover:bg-muted/50 hover:text-foreground border border-transparent"
+                                    ? "text-primary border-primary"
+                                    : "text-muted-foreground hover:text-foreground border-transparent"
                             )}
                         >
                             <tab.icon className="h-4 w-4" />
@@ -61,10 +61,10 @@ export function ResultTabs({ findings }: ResultTabsProps) {
                             {count > 0 && (
                                 <span
                                     className={cn(
-                                        "flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-[10px] font-bold",
+                                        "flex h-4 min-w-[16px] items-center justify-center rounded-full px-1.5 text-[9px] font-bold ml-1",
                                         activeTab === tab.category
                                             ? "bg-primary/20 text-primary"
-                                            : "bg-muted text-muted-foreground"
+                                            : "bg-secondary text-muted-foreground"
                                     )}
                                 >
                                     {count}
@@ -77,10 +77,12 @@ export function ResultTabs({ findings }: ResultTabsProps) {
 
             {/* Findings list */}
             {filteredFindings.length === 0 ? (
-                <EmptyState
-                    title="No issues found"
-                    description={`No ${activeTab} issues were detected in this audit.`}
-                />
+                <div className="bg-card border border-border rounded-lg">
+                    <EmptyState
+                        title="No issues found"
+                        description={`No ${activeTab} issues were detected in this file.`}
+                    />
+                </div>
             ) : (
                 <div className="space-y-4">
                     {filteredFindings.map((finding, index) => (

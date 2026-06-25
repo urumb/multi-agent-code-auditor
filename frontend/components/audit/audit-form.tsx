@@ -75,7 +75,7 @@ export function AuditForm({ onSubmit, isRunning }: AuditFormProps) {
         (inputMode === "paste" && code.trim().length > 0);
 
     return (
-        <div className="p-8 rounded-xl backdrop-blur-md bg-white/5 border border-white/10 shadow-xl hover:-translate-y-1 hover:shadow-2xl transition-all duration-200">
+        <div className="glass-card p-8">
             {/* Mode tabs */}
             <div className="flex gap-2 mb-6">
                 {tabs.map((tab) => (
@@ -84,10 +84,10 @@ export function AuditForm({ onSubmit, isRunning }: AuditFormProps) {
                         type="button"
                         onClick={() => setInputMode(tab.mode)}
                         className={cn(
-                            "flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-all duration-200",
+                            "flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors duration-200",
                             inputMode === tab.mode
                                 ? "bg-primary/10 text-primary border border-primary/20"
-                                : "bg-muted/30 text-muted-foreground hover:bg-muted/50 hover:text-foreground border border-transparent"
+                                : "bg-secondary text-muted-foreground hover:bg-secondary/70 hover:text-foreground border border-transparent"
                         )}
                     >
                         <tab.icon className="h-4 w-4" />
@@ -108,7 +108,7 @@ export function AuditForm({ onSubmit, isRunning }: AuditFormProps) {
                         placeholder="https://github.com/user/repo"
                         value={githubUrl}
                         onChange={(e) => setGithubUrl(e.target.value)}
-                        className="w-full rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/50 transition-all"
+                        className="w-full rounded-md border border-input bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all"
                     />
                 </div>
             )}
@@ -119,12 +119,12 @@ export function AuditForm({ onSubmit, isRunning }: AuditFormProps) {
                     <label className="text-sm font-medium text-foreground">
                         Upload Files
                     </label>
-                    <div className="relative border-2 border-dashed border-border rounded-lg p-8 text-center hover:border-primary/40 transition-colors">
+                    <div className="relative border-2 border-dashed border-input rounded-md p-8 text-center bg-background hover:border-primary/40 transition-colors">
                         <FileUp className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
-                        <p className="text-sm text-muted-foreground mb-2">
+                        <p className="text-sm text-foreground mb-1">
                             Drag and drop files here, or click to browse
                         </p>
-                        <p className="text-xs text-muted-foreground/70">
+                        <p className="text-xs text-muted-foreground">
                             ZIP archives or individual source files
                         </p>
                         <input
@@ -140,7 +140,7 @@ export function AuditForm({ onSubmit, isRunning }: AuditFormProps) {
                             {files.map((file, index) => (
                                 <div
                                     key={`${file.name}-${index}`}
-                                    className="flex items-center justify-between rounded-lg bg-muted/20 px-3 py-2"
+                                    className="flex items-center justify-between rounded-md bg-secondary px-3 py-2 border border-border"
                                 >
                                     <span className="text-sm text-foreground truncate">
                                         {file.name}
@@ -148,7 +148,7 @@ export function AuditForm({ onSubmit, isRunning }: AuditFormProps) {
                                     <button
                                         type="button"
                                         onClick={() => removeFile(index)}
-                                        className="text-muted-foreground hover:text-red-400 transition-colors"
+                                        className="text-muted-foreground hover:text-destructive transition-colors"
                                     >
                                         <X className="h-4 w-4" />
                                     </button>
@@ -169,7 +169,7 @@ export function AuditForm({ onSubmit, isRunning }: AuditFormProps) {
                         <select
                             value={language}
                             onChange={(e) => setLanguage(e.target.value as ProgrammingLanguage)}
-                            className="rounded-lg border border-border bg-muted/30 px-3 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50"
+                            className="rounded-md border border-input bg-background px-3 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50"
                         >
                             {languages.map((lang) => (
                                 <option key={lang.value} value={lang.value}>
@@ -184,7 +184,7 @@ export function AuditForm({ onSubmit, isRunning }: AuditFormProps) {
                         value={code}
                         onChange={(e) => setCode(e.target.value)}
                         rows={12}
-                        className="w-full rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm text-foreground font-mono placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/50 resize-none transition-all"
+                        className="w-full rounded-md border border-input bg-background px-4 py-3 text-sm text-foreground font-mono placeholder:text-muted-foreground focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 resize-none transition-all"
                     />
                 </div>
             )}
@@ -195,10 +195,10 @@ export function AuditForm({ onSubmit, isRunning }: AuditFormProps) {
                 onClick={handleSubmit}
                 disabled={!isValid || isRunning}
                 className={cn(
-                    "mt-6 flex w-full items-center justify-center gap-2 rounded-lg px-6 py-3 text-sm font-semibold transition-all duration-200",
+                    "mt-6 flex w-full items-center justify-center gap-2 rounded-md px-6 py-3 text-sm font-semibold transition-colors duration-200",
                     isValid && !isRunning
-                        ? "bg-primary text-primary-foreground hover:opacity-90 glow-primary"
-                        : "bg-muted text-muted-foreground cursor-not-allowed"
+                        ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                        : "bg-secondary text-muted-foreground cursor-not-allowed"
                 )}
             >
                 <Play className="h-4 w-4" />

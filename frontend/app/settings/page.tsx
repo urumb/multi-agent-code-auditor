@@ -83,10 +83,10 @@ export default function SettingsPage() {
     };
 
     return (
-        <div className="max-w-3xl space-y-6">
+        <div className="max-w-3xl space-y-8">
             {/* Page header */}
             <div>
-                <h1 className="text-2xl font-bold text-foreground tracking-tight">
+                <h1 className="text-2xl font-semibold text-foreground tracking-tight">
                     Settings
                 </h1>
                 <p className="text-sm text-muted-foreground mt-1">
@@ -95,14 +95,14 @@ export default function SettingsPage() {
             </div>
 
             {/* API Configuration */}
-            <div className="glass-card rounded-xl p-5 space-y-4">
-                <div className="flex items-center gap-2">
-                    <Server className="h-4 w-4 text-primary" />
+            <div className="glass-card p-6 space-y-5">
+                <div className="flex items-center gap-2 border-b border-border pb-4">
+                    <Server className="h-4 w-4 text-muted-foreground" />
                     <h3 className="text-sm font-semibold text-foreground">
-                        API Configuration
+                        General Configuration
                     </h3>
                 </div>
-                <div className="space-y-3">
+                <div className="space-y-2">
                     <label className="text-sm font-medium text-foreground" htmlFor="api-url">
                         Backend API URL
                     </label>
@@ -111,7 +111,7 @@ export default function SettingsPage() {
                         type="url"
                         value={apiUrl}
                         onChange={(e) => setApiUrl(e.target.value)}
-                        className="w-full rounded-lg border border-border bg-muted/30 px-4 py-2.5 text-sm text-foreground font-mono focus:outline-none focus:ring-1 focus:ring-primary/50 transition-all"
+                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground font-mono focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all"
                     />
                     <p className="text-xs text-muted-foreground">
                         The FastAPI backend endpoint for audit requests.
@@ -120,30 +120,30 @@ export default function SettingsPage() {
             </div>
 
             {/* Model Configuration */}
-            <div className="glass-card rounded-xl p-6 space-y-4">
-                <div className="flex items-center gap-2">
-                    <Brain className="h-4 w-4 text-primary" />
+            <div className="glass-card p-6 space-y-5">
+                <div className="flex items-center gap-2 border-b border-border pb-4">
+                    <Brain className="h-4 w-4 text-muted-foreground" />
                     <h3 className="text-sm font-semibold text-foreground">
-                        Model Configuration
+                        Local AI Models
                     </h3>
-                    <span className={`ml-auto text-xs px-2 py-1 rounded-full font-medium ${
-                        ollamaStatus === "ok" ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" :
-                        ollamaStatus === "error" ? "bg-red-500/10 text-red-400 border border-red-500/20" :
-                        "bg-yellow-500/10 text-yellow-400 border border-yellow-500/20"
+                    <span className={`ml-auto text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${
+                        ollamaStatus === "ok" ? "bg-primary/10 text-primary border border-primary/20" :
+                        ollamaStatus === "error" ? "bg-destructive/10 text-destructive border border-destructive/20" :
+                        "bg-amber-500/10 text-amber-500 border border-amber-500/20"
                     }`}>
                         {ollamaStatus === "ok" ? "Ollama Connected" :
                          ollamaStatus === "error" ? "Connection Error" : "Checking..."}
                     </span>
                 </div>
-                <div className="space-y-3">
+                <div className="space-y-2">
                     <label className="text-sm font-medium text-foreground" htmlFor="model-select">
-                        LLM Model
+                        Active Model
                     </label>
                     <select
                         id="model-select"
                         value={model}
                         onChange={(e) => setModel(e.target.value)}
-                        className="w-full rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50 transition-all cursor-pointer"
+                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all cursor-pointer"
                     >
                         <option value="deepseek-r1:8b">DeepSeek R1 (8B)</option>
                         <option value="llama3.2">Llama 3.2</option>
@@ -151,18 +151,18 @@ export default function SettingsPage() {
                         <option value="codellama:7b">CodeLlama (7B)</option>
                         <option value="mistral:7b">Mistral (7B)</option>
                     </select>
-                    <p className="text-xs text-slate-400 mt-2">
+                    <p className="text-xs text-muted-foreground mt-2">
                         This project runs AI models locally using Ollama. The AI analysis pipeline will only work when the backend is running on a machine with Ollama installed and a model downloaded.
                     </p>
                 </div>
             </div>
 
             {/* Preferences */}
-            <div className="glass-card rounded-xl p-5 space-y-4">
-                <div className="flex items-center gap-2">
-                    <Palette className="h-4 w-4 text-primary" />
+            <div className="glass-card p-6 space-y-5">
+                <div className="flex items-center gap-2 border-b border-border pb-4">
+                    <Palette className="h-4 w-4 text-muted-foreground" />
                     <h3 className="text-sm font-semibold text-foreground">
-                        Preferences
+                        Appearance & Behavior
                     </h3>
                 </div>
                 <div className="flex items-center justify-between">
@@ -175,11 +175,11 @@ export default function SettingsPage() {
                     <button
                         type="button"
                         onClick={() => setAutoRetry(!autoRetry)}
-                        className={`relative h-6 w-11 rounded-full transition-colors ${autoRetry ? "bg-primary" : "bg-muted"
+                        className={`relative h-5 w-9 rounded-full transition-colors ${autoRetry ? "bg-primary" : "bg-secondary"
                             }`}
                     >
                         <span
-                            className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white transition-transform ${autoRetry ? "translate-x-5" : "translate-x-0"
+                            className={`absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white transition-transform ${autoRetry ? "translate-x-4" : "translate-x-0"
                                 }`}
                         />
                     </button>
@@ -191,7 +191,7 @@ export default function SettingsPage() {
                 <button
                     type="button"
                     onClick={handleSave}
-                    className="flex items-center gap-2 rounded-lg bg-primary px-6 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90 glow-primary transition-all"
+                    className="flex items-center gap-2 rounded-md bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
                 >
                     <Save className="h-4 w-4" />
                     Save Settings
@@ -199,7 +199,7 @@ export default function SettingsPage() {
                 <button
                     type="button"
                     onClick={handleReset}
-                    className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 px-6 py-2.5 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
+                    className="flex items-center gap-2 rounded-md border border-border bg-secondary/50 px-5 py-2.5 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
                 >
                     <RotateCcw className="h-4 w-4" />
                     Reset Defaults

@@ -25,30 +25,30 @@ const statusConfig: Record<AuditStatus, { label: string; classes: string; dotCol
  */
 export function RecentAudits({ audits }: RecentAuditsProps) {
     return (
-        <div className="glass-card rounded-xl p-6 h-full flex flex-col">
-            <h3 className="text-base font-semibold text-foreground mb-5 tracking-tight">
+        <div className="glass-card p-6 h-full flex flex-col">
+            <h3 className="text-sm font-semibold text-foreground mb-4">
                 Recent Audits
             </h3>
-            <div className="space-y-3 flex-1">
+            <div className="space-y-2 flex-1">
                 {audits.map((audit, index) => {
                     const config = statusConfig[audit.status];
                     return (
                         <div
                             key={audit.id}
-                            className="group flex flex-col sm:flex-row sm:items-center gap-4 rounded-xl bg-slate-800/30 border border-transparent px-4 py-3.5 transition-all duration-200 hover:bg-slate-800/60 hover:border-slate-700 hover:shadow-md animate-fade-in"
+                            className="group flex flex-col sm:flex-row sm:items-center gap-3 rounded-md px-3 py-3 transition-colors duration-200 hover:bg-secondary/50 animate-fade-in border border-transparent hover:border-border"
                             style={{ animationDelay: `${index * 80}ms` }}
                         >
-                            <div className="flex items-center gap-4 flex-1 min-w-0">
-                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-800/80 border border-slate-700/50 group-hover:scale-105 transition-transform duration-200 shadow-inner">
-                                    <GitBranch className="h-4 w-4 text-slate-400 group-hover:text-primary transition-colors" />
+                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-secondary border border-border">
+                                    <GitBranch className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-semibold text-foreground truncate drop-shadow-sm">
+                                    <p className="text-sm font-medium text-foreground truncate">
                                         {audit.repository}
                                     </p>
-                                    <div className="flex items-center gap-1.5 mt-1">
-                                        <Clock className="h-3 w-3 text-slate-500" />
-                                        <span className="text-xs text-slate-400 font-medium tracking-wide">
+                                    <div className="flex items-center gap-1.5 mt-0.5">
+                                        <Clock className="h-3 w-3 text-muted-foreground" />
+                                        <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
                                             {new Date(audit.date).toLocaleDateString("en-US", {
                                                 month: "short",
                                                 day: "numeric",
@@ -59,23 +59,23 @@ export function RecentAudits({ audits }: RecentAuditsProps) {
                                     </div>
                                 </div>
                             </div>
-                            <div className="flex items-center justify-between sm:justify-end gap-4 shrink-0 mt-2 sm:mt-0">
+                            <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 mt-2 sm:mt-0">
                                 {audit.status === "completed" && (
-                                    <span className="text-xs font-medium text-slate-400 whitespace-nowrap">
+                                    <span className="text-xs text-muted-foreground font-medium">
                                         {audit.findings} findings
                                     </span>
                                 )}
                                 <span
                                     className={cn(
-                                        "inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-xs font-semibold shadow-sm whitespace-nowrap",
+                                        "inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider whitespace-nowrap",
                                         config.classes
                                     )}
                                 >
-                                    <span className="relative flex h-2 w-2 shrink-0">
+                                    <span className="relative flex h-1.5 w-1.5 shrink-0">
                                         {config.pulsing && (
                                             <span className={cn("animate-ping absolute inline-flex h-full w-full rounded-full opacity-75", config.dotColor)}></span>
                                         )}
-                                        <span className={cn("relative inline-flex rounded-full h-2 w-2", config.dotColor)}></span>
+                                        <span className={cn("relative inline-flex rounded-full h-1.5 w-1.5", config.dotColor)}></span>
                                     </span>
                                     {config.label}
                                 </span>

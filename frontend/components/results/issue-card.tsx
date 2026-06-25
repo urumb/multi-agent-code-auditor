@@ -42,35 +42,35 @@ export function IssueCard({ finding, index = 0 }: IssueCardProps) {
     return (
         <div
             className={cn(
-                "glass-card overflow-hidden animate-fade-in group",
+                "glass-card overflow-hidden animate-fade-in group transition-colors duration-200",
                 finding.severity === "critical"
-                    ? "border-red-500/40 shadow-[0_4px_15px_-3px_rgba(239,68,68,0.1)] hover:border-red-500/60"
+                    ? "border-destructive/30 hover:border-destructive/50"
                     : finding.severity === "warning"
-                        ? "border-yellow-400/40 shadow-[0_4px_15px_-3px_rgba(250,204,21,0.1)] hover:border-yellow-400/60"
-                        : "hover:border-primary/20"
+                        ? "border-amber-500/30 hover:border-amber-500/50"
+                        : "border-border hover:border-primary/30"
             )}
             style={{ animationDelay: `${index * 100}ms` }}
         >
             {/* Header */}
-            <div className="p-4">
+            <div className="p-4 bg-background">
                 <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-2">
                             <SeverityBadge severity={finding.severity} />
-                            <span className="text-xs text-muted-foreground">
+                            <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold">
                                 {finding.agent}
                             </span>
                         </div>
                         <h4 className="text-sm font-semibold text-foreground">
                             {finding.title}
                         </h4>
-                        <div className="flex items-center gap-1.5 mt-1.5">
+                        <div className="flex items-center gap-1.5 mt-2">
                             <FileCode className="h-3.5 w-3.5 text-muted-foreground" />
-                            <span className="text-xs text-muted-foreground font-mono">
+                            <span className="text-xs text-muted-foreground font-mono bg-secondary/50 px-1.5 py-0.5 rounded">
                                 {finding.file}:{finding.line}
                             </span>
                             {finding.cwe && (
-                                <span className="ml-2 inline-flex items-center rounded-md bg-muted px-2 py-1 text-xs font-medium text-muted-foreground ring-1 ring-inset ring-border">
+                                <span className="ml-2 inline-flex items-center rounded-md bg-secondary/50 px-2 py-0.5 text-[10px] font-medium text-muted-foreground border border-border">
                                     {finding.cwe}
                                 </span>
                             )}
@@ -79,7 +79,7 @@ export function IssueCard({ finding, index = 0 }: IssueCardProps) {
                     <button
                         type="button"
                         onClick={() => setExpanded(!expanded)}
-                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted/30 text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
+                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/70 transition-colors"
                     >
                         {expanded ? (
                             <ChevronUp className="h-4 w-4" />
@@ -89,57 +89,61 @@ export function IssueCard({ finding, index = 0 }: IssueCardProps) {
                     </button>
                 </div>
 
-                <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
+                <p className="mt-3 text-sm text-muted-foreground leading-relaxed">
                     {finding.description}
                 </p>
             </div>
 
             {/* Expanded content */}
             {expanded && (
-                <div className="border-t border-border px-4 py-4 space-y-4">
+                <div className="border-t border-border px-4 py-5 space-y-5 bg-card">
                     {/* Original code */}
-                    <div>
-                        <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider">
-                            Current Code
-                        </p>
-                        <CodeViewer
-                            code={finding.before_code || finding.codeSnippet}
-                            language="python"
-                            highlightLine={1}
-                        />
-                    </div>
+                    {finding.before_code && (
+                      <div>
+                          <p className="text-xs font-bold text-muted-foreground mb-2 uppercase tracking-wider">
+                              Current Code
+                          </p>
+                          <CodeViewer
+                              code={finding.before_code || finding.codeSnippet}
+                              language="python"
+                              highlightLine={1}
+                          />
+                      </div>
+                    )}
 
                     {/* Suggested fix */}
-                    <div>
-                        <div className="flex items-center justify-between mb-2">
-                            <p className="text-xs font-medium text-emerald-400 uppercase tracking-wider">
-                                Suggested Fix
-                            </p>
-                            <button
-                                type="button"
-                                onClick={handleCopyFix}
-                                className={cn(
-                                    "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all",
-                                    copied
-                                        ? "bg-emerald-500/10 text-emerald-400"
-                                        : "bg-primary/10 text-primary hover:bg-primary/20"
-                                )}
-                            >
-                                {copied ? (
-                                    <>
-                                        <Check className="h-3 w-3" />
-                                        Copied!
-                                    </>
-                                ) : (
-                                    <>
-                                        <Copy className="h-3 w-3" />
-                                        Copy Fix
-                                    </>
-                                )}
-                            </button>
-                        </div>
-                        <CodeViewer code={finding.after_code || finding.suggestedFix} language="python" />
-                    </div>
+                    {(finding.after_code || finding.suggestedFix) && (
+                      <div>
+                          <div className="flex items-center justify-between mb-2">
+                              <p className="text-xs font-bold text-primary uppercase tracking-wider">
+                                  Suggested Fix
+                              </p>
+                              <button
+                                  type="button"
+                                  onClick={handleCopyFix}
+                                  className={cn(
+                                      "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
+                                      copied
+                                          ? "bg-primary text-primary-foreground"
+                                          : "bg-primary/10 text-primary hover:bg-primary/20"
+                                  )}
+                              >
+                                  {copied ? (
+                                      <>
+                                          <Check className="h-3 w-3" />
+                                          Copied
+                                      </>
+                                  ) : (
+                                      <>
+                                          <Copy className="h-3 w-3" />
+                                          Copy Fix
+                                      </>
+                                  )}
+                              </button>
+                          </div>
+                          <CodeViewer code={finding.after_code || finding.suggestedFix} language="python" />
+                      </div>
+                    )}
                 </div>
             )}
         </div>

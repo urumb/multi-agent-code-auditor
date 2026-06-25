@@ -76,14 +76,14 @@ export default function DashboardPage() {
           {trendData.length > 0 ? (
             <TrendChart data={trendData} />
           ) : (
-            <div className="glass-card rounded-xl p-5">
+            <div className="glass-card p-8 flex flex-col items-center justify-center min-h-[300px]">
               <EmptyState
                 title="No trend data"
                 description="Run your first audit to see vulnerability trends."
                 action={
                   <Link
                     href="/audit"
-                    className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
+                    className="mt-4 flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
                   >
                     <Play className="h-4 w-4" />
                     Run Audit
@@ -97,7 +97,7 @@ export default function DashboardPage() {
           {recentAudits.length > 0 ? (
             <RecentAudits audits={recentAudits} />
           ) : (
-            <div className="glass-card rounded-xl p-5">
+            <div className="glass-card p-8 flex flex-col items-center justify-center min-h-[300px]">
               <EmptyState
                 title="No audits yet"
                 description="Run your first scan to see results here."

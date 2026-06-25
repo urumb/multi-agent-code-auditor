@@ -186,7 +186,7 @@ export default function ResultsPage() {
                     <button
                         type="button"
                         onClick={exportAsJson}
-                        className="flex items-center gap-2 rounded-lg bg-white/5 backdrop-blur-md border border-white/10 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-white/10 hover:shadow-md transition-all duration-200"
+                        className="flex items-center gap-2 rounded-md bg-secondary/50 border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-secondary hover:shadow-sm transition-colors duration-200"
                     >
                         <FileJson className="h-4 w-4 text-primary" />
                         Export JSON
@@ -194,9 +194,9 @@ export default function ResultsPage() {
                     <button
                         type="button"
                         onClick={exportAsPdf}
-                        className="flex items-center gap-2 rounded-lg bg-white/5 backdrop-blur-md border border-white/10 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-white/10 hover:shadow-md transition-all duration-200"
+                        className="flex items-center gap-2 rounded-md bg-secondary/50 border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-secondary hover:shadow-sm transition-colors duration-200"
                     >
-                        <Download className="h-4 w-4 text-emerald-400" />
+                        <Download className="h-4 w-4 text-primary" />
                         Export PDF
                     </button>
                 </div>
@@ -207,46 +207,47 @@ export default function ResultsPage() {
                 {result.results.map((file: FileAuditResult) => (
                     <div
                         key={file.file_path}
-                        className="glass-card rounded-xl overflow-hidden"
+                        className="glass-card overflow-hidden"
                     >
                         {/* File header — clickable to expand/collapse */}
                         <button
                             type="button"
                             onClick={() => toggleFile(file.file_path)}
-                            className="w-full flex items-center justify-between p-5 text-left hover:bg-white/5 transition-colors"
+                            className="w-full flex items-center justify-between p-4 text-left hover:bg-secondary/30 transition-colors border-b border-transparent data-[state=open]:border-border"
+                            data-state={expandedFile === file.file_path ? "open" : "closed"}
                         >
                             <div className="flex items-center gap-3">
-                                <FileText className="h-5 w-5 text-primary shrink-0" />
+                                <FileText className="h-4 w-4 text-primary shrink-0" />
                                 <span className="text-sm font-medium text-foreground font-mono">
                                     {file.file_path}
                                 </span>
-                                {file.risk_score !== undefined && (
+                                {file.risk_score !== undefined && file.risk_score > 0 && (
                                     <span className={cn(
-                                        "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium border",
-                                        file.risk_score >= 7 ? "bg-red-500/10 text-red-400 border-red-500/20" :
-                                        file.risk_score >= 4 ? "bg-yellow-500/10 text-yellow-400 border-yellow-500/20" :
-                                        "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                                        "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] uppercase font-bold tracking-wider border",
+                                        file.risk_score >= 7 ? "bg-destructive/10 text-destructive border-destructive/20" :
+                                        file.risk_score >= 4 ? "bg-amber-500/10 text-amber-500 border-amber-500/20" :
+                                        "bg-primary/10 text-primary border-primary/20"
                                     )}>
-                                        Risk Score: {file.risk_score.toFixed(1)}
+                                        Risk: {file.risk_score.toFixed(1)}
                                     </span>
                                 )}
                             </div>
                             {file.error ? (
-                                <span className="inline-flex items-center rounded-full bg-red-500/10 text-red-400 border border-red-500/20 px-2.5 py-0.5 text-xs font-medium">
-                                    error
+                                <span className="inline-flex items-center rounded-full bg-destructive/10 text-destructive border border-destructive/20 px-2.5 py-0.5 text-[10px] uppercase font-bold tracking-wider">
+                                    Error
                                 </span>
                             ) : (
-                                <span className="inline-flex items-center rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-0.5 text-xs font-medium">
-                                    report ready
+                                <span className="inline-flex items-center rounded-full bg-primary/10 text-primary border border-primary/20 px-2.5 py-0.5 text-[10px] uppercase font-bold tracking-wider">
+                                    Ready
                                 </span>
                             )}
                         </button>
 
                         {/* Expanded report */}
                         {expandedFile === file.file_path && (
-                            <div className="border-t border-white/10 p-5">
+                            <div className="border-t border-border p-6 bg-background">
                                 {file.error ? (
-                                    <p className="text-sm text-red-400">
+                                    <p className="text-sm text-destructive">
                                         {file.error}
                                     </p>
                                 ) : (
@@ -259,29 +260,40 @@ export default function ResultsPage() {
                                                 const topRiskFiles = data["top_risk_files"] || [];
 
                                                 return (
-                                                    <div className="space-y-6">
+                                                    <div className="space-y-8">
                                                         {topRiskFiles.length > 0 && (
-                                                            <div className="bg-red-500/10 border border-red-500/20 p-4 rounded-lg">
-                                                                <h4 className="text-sm font-semibold text-red-400 mb-2">Top Risk Files</h4>
-                                                                <ul className="list-disc list-inside text-sm text-muted-foreground">
+                                                            <div className="bg-destructive/5 border border-destructive/20 p-5 rounded-md">
+                                                                <h4 className="text-xs uppercase font-bold tracking-wider text-destructive mb-3">Top Risk Files</h4>
+                                                                <ul className="space-y-1.5">
                                                                     {topRiskFiles.map((trf: { file_path: string; risk_score?: number }) => (
-                                                                        <li key={trf.file_path}>{trf.file_path} - Score: {trf.risk_score?.toFixed(1)}</li>
+                                                                        <li key={trf.file_path} className="flex justify-between items-center text-sm">
+                                                                            <span className="font-mono text-muted-foreground">{trf.file_path}</span>
+                                                                            <span className="font-medium text-destructive">{trf.risk_score?.toFixed(1)}</span>
+                                                                        </li>
                                                                     ))}
                                                                 </ul>
                                                             </div>
                                                         )}
-                                                        <div>
-                                                            <h4 className="text-sm font-semibold text-foreground mb-2">Executive Summary</h4>
-                                                            <p className="text-sm text-muted-foreground">{execSummary}</p>
-                                                        </div>
-                                                        <div>
-                                                            <h4 className="text-sm font-semibold text-foreground mb-2">Findings Summary</h4>
-                                                            <p className="text-sm text-muted-foreground">{findingsSummary}</p>
-                                                        </div>
+                                                        {(execSummary || findingsSummary) && (
+                                                          <div className="grid md:grid-cols-2 gap-6 bg-secondary/20 border border-border p-6 rounded-md">
+                                                              {execSummary && (
+                                                                <div>
+                                                                    <h4 className="text-xs uppercase font-bold tracking-wider text-muted-foreground mb-2">Executive Summary</h4>
+                                                                    <p className="text-sm text-foreground leading-relaxed">{execSummary}</p>
+                                                                </div>
+                                                              )}
+                                                              {findingsSummary && (
+                                                                <div>
+                                                                    <h4 className="text-xs uppercase font-bold tracking-wider text-muted-foreground mb-2">Findings Summary</h4>
+                                                                    <p className="text-sm text-foreground leading-relaxed">{findingsSummary}</p>
+                                                                </div>
+                                                              )}
+                                                          </div>
+                                                        )}
 
                                                         {findings.length > 0 && (
                                                             <div>
-                                                                <h4 className="text-sm font-semibold text-foreground mb-4 mt-6">Detailed Findings</h4>
+                                                                <h4 className="text-xs uppercase font-bold tracking-wider text-muted-foreground mb-4">Detailed Findings</h4>
                                                                 <ResultTabs findings={findings} />
                                                             </div>
                                                         )}
@@ -289,7 +301,7 @@ export default function ResultsPage() {
                                                 );
                                             } catch {
                                                 return (
-                                                    <pre className="text-sm text-muted-foreground whitespace-pre-wrap font-mono leading-relaxed max-h-[600px] overflow-y-auto">
+                                                    <pre className="text-sm text-muted-foreground whitespace-pre-wrap font-mono leading-relaxed max-h-[600px] overflow-y-auto p-4 bg-secondary/30 rounded-md border border-border">
                                                         {file.final_report ||
                                                             "No report generated."}
                                                     </pre>

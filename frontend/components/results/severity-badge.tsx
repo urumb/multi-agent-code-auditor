@@ -15,15 +15,15 @@ interface SeverityBadgeProps {
 const severityConfig: Record<Severity, { label: string; classes: string }> = {
     critical: {
         label: "Critical",
-        classes: "bg-red-500/10 text-red-400 border-red-500/20",
+        classes: "bg-destructive/10 text-destructive border-destructive/20",
     },
     warning: {
         label: "Warning",
-        classes: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20",
+        classes: "bg-amber-500/10 text-amber-500 border-amber-500/20",
     },
     info: {
         label: "Info",
-        classes: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+        classes: "bg-primary/10 text-primary border-primary/20",
     },
 };
 
@@ -38,7 +38,7 @@ export function SeverityBadge({ severity, className }: SeverityBadgeProps) {
     return (
         <span
             className={cn(
-                "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold",
+                "inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] uppercase font-bold tracking-wider",
                 config.classes,
                 className
             )}
@@ -46,9 +46,9 @@ export function SeverityBadge({ severity, className }: SeverityBadgeProps) {
             <span
                 className={cn(
                     "h-1.5 w-1.5 rounded-full",
-                    severity === "critical" && "bg-red-400",
-                    severity === "warning" && "bg-yellow-400",
-                    severity === "info" && "bg-emerald-400"
+                    severity === "critical" && "bg-destructive",
+                    severity === "warning" && "bg-amber-500",
+                    severity === "info" && "bg-primary"
                 )}
             />
             {config.label}

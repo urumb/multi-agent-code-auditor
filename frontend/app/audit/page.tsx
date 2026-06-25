@@ -74,7 +74,7 @@ export default function AuditPage() {
                                     document.body.removeChild(a);
                                     URL.revokeObjectURL(url);
                                 }}
-                                className="rounded-lg border border-primary/20 bg-primary/10 px-4 py-2 text-sm font-medium text-primary hover:bg-primary/20 transition-all"
+                                className="rounded-md border border-primary/20 bg-primary/10 px-4 py-2 text-sm font-medium text-primary hover:bg-primary/20 transition-colors"
                             >
                                 Export JSON
                             </button>
@@ -82,7 +82,7 @@ export default function AuditPage() {
                         <button
                             type="button"
                             onClick={reset}
-                            className="rounded-lg border border-border bg-muted/30 px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
+                            className="rounded-md border border-border bg-secondary/50 px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
                         >
                             New Audit
                         </button>
@@ -96,7 +96,7 @@ export default function AuditPage() {
 
                 {/* Current file indicator */}
                 {currentFile && (
-                    <div className="flex items-center gap-3 rounded-lg bg-primary/5 border border-primary/20 px-4 py-3 animate-fade-in">
+                    <div className="flex items-center gap-3 rounded-md bg-primary/5 border border-primary/20 px-4 py-3 animate-fade-in">
                         <FileCode className="h-4 w-4 text-primary animate-pulse" />
                         <span className="text-sm text-foreground">
                             Processing:{" "}
@@ -112,7 +112,7 @@ export default function AuditPage() {
                     <div className="relative">
                         <ProgressIndicator stages={stages} />
                         {status === "completed" && duration && (
-                            <div className="absolute top-5 right-5 text-sm font-medium text-emerald-400 bg-emerald-400/10 px-3 py-1 rounded-full animate-fade-in">
+                            <div className="absolute top-5 right-5 text-xs font-medium text-primary bg-primary/10 border border-primary/20 px-2 py-1 rounded-full animate-fade-in">
                                 Completed in {duration}s
                             </div>
                         )}
@@ -120,7 +120,7 @@ export default function AuditPage() {
                 )}
 
                 {status !== "idle" && (
-                    <div className="w-full h-[420px] bg-white/5 backdrop-blur-lg border border-white/10 rounded-xl p-4">
+                    <div className="w-full h-[420px] bg-card border border-border rounded-lg p-2 shadow-sm">
                         <AgentGraph nodeStates={agentGraphStates} />
                     </div>
                 )}

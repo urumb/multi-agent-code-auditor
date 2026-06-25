@@ -111,14 +111,14 @@ export function Header() {
     };
 
     return (
-        <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center justify-between border-b border-border bg-background/50 backdrop-blur-xl px-6 transition-all duration-200 overflow-visible">
+        <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center justify-between border-b border-border bg-background px-6 transition-all duration-200 overflow-visible">
             {/* Search */}
             <div className="relative flex-1 max-w-md group">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors duration-200" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-foreground transition-colors duration-200" />
                 <input
                     type="text"
                     placeholder="Search audits, files, findings..."
-                    className="w-full rounded-lg border border-white/5 bg-white/5 py-2 pl-10 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 focus:bg-white/10 transition-all duration-200"
+                    className="w-full rounded-md border border-input bg-background py-2 pl-9 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all duration-200"
                 />
             </div>
 
@@ -129,11 +129,11 @@ export function Header() {
                     <button
                         type="button"
                         onClick={() => setIsNotifOpen(!isNotifOpen)}
-                        className="relative flex h-10 w-10 items-center justify-center rounded-lg border border-white/5 bg-white/5 text-muted-foreground hover:text-foreground hover:bg-white/10 hover:border-white/10 hover:shadow-md transition-all duration-200 group"
+                        className="relative flex h-9 w-9 items-center justify-center rounded-md border border-input bg-background text-muted-foreground hover:text-foreground hover:bg-secondary transition-all duration-200 group"
                     >
-                        <Bell className="h-4 w-4 group-hover:scale-110 transition-transform duration-200" />
+                        <Bell className="h-4 w-4" />
                         {unreadCount > 0 && (
-                            <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-blue-500 text-[10px] font-bold text-white shadow-sm ring-2 ring-background">
+                            <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground shadow-sm">
                                 {unreadCount}
                             </span>
                         )}
@@ -141,15 +141,12 @@ export function Header() {
 
                     {/* Notification Dropdown Panel */}
                     {isNotifOpen && (
-                        <div className="absolute right-0 top-14 z-50 w-80 rounded-xl bg-slate-900/70 backdrop-blur-xl border border-white/10 shadow-2xl">
-                            {/* Glass Overlay Layer */}
-                            <div className="absolute inset-0 bg-black/20 backdrop-blur-xl rounded-xl pointer-events-none" />
-
+                        <div className="absolute right-0 top-12 z-50 w-80 rounded-md bg-popover border border-border shadow-md">
                             {/* Content */}
                             <div className="relative flex flex-col">
                                 {/* Header */}
-                                <div className="px-4 py-3 border-b border-white/10">
-                                    <h3 className="text-sm font-semibold text-white/90">Notifications</h3>
+                                <div className="px-4 py-3 border-b border-border">
+                                    <h3 className="text-sm font-semibold text-foreground">Notifications</h3>
                                 </div>
 
                                 {/* Scrollable list */}
@@ -165,8 +162,8 @@ export function Header() {
                                                 <div
                                                     key={notif.id}
                                                     className={[
-                                                        "px-4 py-3 rounded-lg hover:bg-white/5 transition-colors cursor-pointer flex gap-3",
-                                                        index !== notifs.length - 1 ? "border-b border-white/5" : "",
+                                                        "px-4 py-3 hover:bg-secondary/50 transition-colors cursor-pointer flex gap-3",
+                                                        index !== notifs.length - 1 ? "border-b border-border" : "",
                                                         notif.read ? "opacity-50" : "",
                                                     ].join(" ")}
                                                 >
@@ -180,7 +177,7 @@ export function Header() {
                                                         <p className="text-xs text-muted-foreground line-clamp-2">
                                                             {notif.description}
                                                         </p>
-                                                        <p className="text-[10px] text-slate-500 mt-1.5 font-medium">
+                                                        <p className="text-[10px] text-muted-foreground mt-1.5 font-medium">
                                                             {notif.time}
                                                         </p>
                                                     </div>
@@ -191,11 +188,11 @@ export function Header() {
                                 </div>
 
                                 {/* Sticky Footer */}
-                                <div className="px-4 py-3 border-t border-white/10 text-center">
+                                <div className="px-4 py-3 border-t border-border text-center bg-muted/50 rounded-b-md">
                                     <button
                                         type="button"
                                         onClick={markAllAsRead}
-                                        className="text-sm text-blue-400 hover:text-blue-300 transition-colors"
+                                        className="text-sm text-primary hover:text-primary/80 transition-colors"
                                     >
                                         Mark all as read
                                     </button>
@@ -206,10 +203,10 @@ export function Header() {
                 </div>
 
                 {/* Backend Status Indicator */}
-                <div className="flex items-center gap-2 text-sm text-green-400 font-medium bg-white/5 hover:bg-white/10 transition-colors border border-white/10 px-3 py-1.5 rounded-full">
+                <div className="flex items-center gap-2 text-xs text-primary font-medium bg-primary/10 border border-primary/20 px-3 py-1.5 rounded-full">
                     <span className="relative flex h-2 w-2">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
                     </span>
                     Backend Online
                 </div>

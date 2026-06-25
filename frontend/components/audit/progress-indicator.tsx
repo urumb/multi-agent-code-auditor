@@ -17,47 +17,47 @@ interface ProgressIndicatorProps {
  */
 export function ProgressIndicator({ stages }: ProgressIndicatorProps) {
     return (
-        <div className="glass-card rounded-xl p-5">
-            <h3 className="text-sm font-semibold text-foreground mb-5">
+        <div className="glass-card p-6">
+            <h3 className="text-sm font-semibold text-foreground mb-6">
                 Audit Progress
             </h3>
-            <div className="space-y-0">
+            <div className="flex flex-col space-y-0">
                 {stages.map((stage, index) => (
-                    <div key={stage.id} className="flex items-start gap-3">
+                    <div key={stage.id} className="flex items-start gap-4">
                         {/* Vertical connector + icon */}
                         <div className="flex flex-col items-center">
                             <div
                                 className={cn(
-                                    "flex h-8 w-8 items-center justify-center rounded-full border-2 transition-all duration-300",
+                                    "flex h-7 w-7 items-center justify-center rounded-full border transition-colors duration-300",
                                     stage.status === "completed" &&
-                                    "border-emerald-500 bg-emerald-500/10",
+                                    "border-primary bg-primary/10",
                                     stage.status === "running" &&
                                     "border-primary bg-primary/10",
                                     stage.status === "pending" &&
-                                    "border-border bg-muted/30",
+                                    "border-border bg-secondary/50",
                                     stage.status === "error" &&
-                                    "border-red-500 bg-red-500/10"
+                                    "border-destructive bg-destructive/10"
                                 )}
                             >
                                 {stage.status === "completed" && (
-                                    <Check className="h-4 w-4 text-emerald-400" />
+                                    <Check className="h-3.5 w-3.5 text-primary" />
                                 )}
                                 {stage.status === "running" && (
-                                    <Loader2 className="h-4 w-4 text-primary animate-spin" />
+                                    <Loader2 className="h-3.5 w-3.5 text-primary animate-spin" />
                                 )}
                                 {stage.status === "pending" && (
-                                    <Circle className="h-3 w-3 text-muted-foreground" />
+                                    <Circle className="h-2.5 w-2.5 text-muted-foreground" />
                                 )}
                                 {stage.status === "error" && (
-                                    <AlertCircle className="h-4 w-4 text-red-400" />
+                                    <AlertCircle className="h-3.5 w-3.5 text-destructive" />
                                 )}
                             </div>
                             {index < stages.length - 1 && (
                                 <div
                                     className={cn(
-                                        "w-0.5 h-8 transition-colors duration-300",
+                                        "w-px h-8 transition-colors duration-300 my-1",
                                         stage.status === "completed"
-                                            ? "bg-emerald-500/40"
+                                            ? "bg-primary/40"
                                             : "bg-border"
                                     )}
                                 />
@@ -65,14 +65,14 @@ export function ProgressIndicator({ stages }: ProgressIndicatorProps) {
                         </div>
 
                         {/* Label */}
-                        <div className="pt-1.5">
+                        <div className="pt-1">
                             <p
                                 className={cn(
                                     "text-sm font-medium transition-colors duration-300",
-                                    stage.status === "completed" && "text-emerald-400",
+                                    stage.status === "completed" && "text-foreground",
                                     stage.status === "running" && "text-primary",
                                     stage.status === "pending" && "text-muted-foreground",
-                                    stage.status === "error" && "text-red-400"
+                                    stage.status === "error" && "text-destructive"
                                 )}
                             >
                                 {stage.label}

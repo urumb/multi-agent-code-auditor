@@ -41,25 +41,25 @@ export function AgentActivityLog({ logs, activeAgent }: AgentActivityLogProps) {
     }, [logs]);
 
     return (
-        <div className="glass-card rounded-xl p-6 border-slate-700/50 hover:border-slate-600/50 transition-colors duration-300">
+        <div className="glass-card p-6">
             {/* Card header */}
             <div className="flex flex-col gap-3 mb-4">
                 <div className="flex items-center gap-2.5">
-                    <div className="p-2 rounded-lg bg-slate-800 border border-white/10">
-                        <Terminal className="w-5 h-5 text-slate-300" />
+                    <div className="p-2 rounded-md bg-secondary/50 border border-border">
+                        <Terminal className="w-4 h-4 text-muted-foreground" />
                     </div>
-                    <h3 className="text-lg font-semibold text-white">
+                    <h3 className="text-sm font-semibold text-foreground">
                         Agent Activity Log
                     </h3>
                 </div>
                 <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2 text-sm text-green-400">
-                        <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-                        Live Server
+                    <div className="flex items-center gap-2 text-xs text-primary font-medium">
+                        <span className="w-1.5 h-1.5 bg-primary rounded-full animate-pulse" />
+                        Live Stream
                     </div>
                     {activeAgent && activeAgent !== "System" && (
-                        <div className="flex items-center gap-2 text-xs text-primary font-medium animate-fade-in">
-                            <span className="w-1.5 h-1.5 bg-primary rounded-full animate-pulse" />
+                        <div className="flex items-center gap-2 text-xs text-primary/80 font-medium animate-fade-in">
+                            <span className="w-1 h-1 bg-primary/80 rounded-full animate-pulse" />
                             {activeAgent}
                         </div>
                     )}
@@ -68,10 +68,10 @@ export function AgentActivityLog({ logs, activeAgent }: AgentActivityLogProps) {
 
             <div
                 ref={scrollRef}
-                className="h-[320px] overflow-y-auto rounded-xl bg-[#0f172a] border border-slate-800 p-5 font-mono text-sm leading-relaxed space-y-2 shadow-inner whitespace-pre-wrap break-words"
+                className="h-[320px] overflow-y-auto rounded-md bg-background border border-border p-4 font-mono text-xs leading-relaxed space-y-2 whitespace-pre-wrap break-words"
             >
                 {logs.length === 0 ? (
-                    <p className="text-slate-500 italic mt-2 ml-2">
+                    <p className="text-muted-foreground italic">
                         System ready. Waiting for audit task...
                     </p>
                 ) : (
@@ -83,16 +83,16 @@ export function AgentActivityLog({ logs, activeAgent }: AgentActivityLogProps) {
                                 key={log.id}
                                 className={cn(
                                     "flex gap-3 animate-fade-in break-words",
-                                    isActive && "bg-white/5 -mx-2 px-2 py-0.5 rounded"
+                                    isActive && "bg-secondary/50 -mx-2 px-2 py-0.5 rounded-sm"
                                 )}
                                 style={{ animationDelay: `${index * 30}ms` }}
                             >
-                                <span className="text-slate-500 shrink-0 select-none">
+                                <span className="text-muted-foreground/50 shrink-0 select-none">
                                     [{log.timestamp}]
                                 </span>
                                 <span
                                     className={cn(
-                                        "font-semibold shrink-0 drop-shadow-sm",
+                                        "font-semibold shrink-0",
                                         agentColorMap[log.agent] ?? "text-foreground",
                                         isActive && "underline decoration-primary/40"
                                     )}
@@ -101,10 +101,10 @@ export function AgentActivityLog({ logs, activeAgent }: AgentActivityLogProps) {
                                 </span>
                                 <span
                                     className={cn(
-                                        log.level === "warning" && "text-yellow-400",
-                                        log.level === "error" && "text-red-400",
-                                        log.level === "success" && "text-emerald-400",
-                                        log.level === "info" && "text-slate-300"
+                                        log.level === "warning" && "text-yellow-500",
+                                        log.level === "error" && "text-destructive",
+                                        log.level === "success" && "text-primary",
+                                        log.level === "info" && "text-muted-foreground"
                                     )}
                                 >
                                     {log.message}

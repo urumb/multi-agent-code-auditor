@@ -1,7 +1,5 @@
 import { cn } from "@/lib/utils";
 import {
-    TrendingUp,
-    TrendingDown,
     FolderGit2,
     ShieldAlert,
     Bug,
@@ -43,49 +41,28 @@ const iconMap: Record<string, LucideIcon> = {
 export function MetricCard({
     label,
     value,
-    trend,
-    trendDirection,
     icon,
     className,
 }: MetricCardProps) {
     const IconComponent = iconMap[icon] ?? FolderGit2;
-    // const isPositiveTrend = trendDirection === "down" && icon === "shield-alert";
-    const trendPositive =
-        (trendDirection === "up" && icon !== "shield-alert" && icon !== "bug") ||
-        (trendDirection === "down" && (icon === "shield-alert" || icon === "bug"));
 
     return (
         <div
             className={cn(
-                "glass-card rounded-xl p-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl group",
+                "glass-card p-6 transition-colors duration-200 hover:border-primary/30",
                 className
             )}
         >
             <div className="flex items-start justify-between">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-800/80 border border-slate-700/50 group-hover:bg-primary/20 group-hover:border-primary/30 transition-all duration-300 shadow-inner">
-                    <IconComponent className="h-6 w-6 text-primary group-hover:scale-110 transition-transform duration-300" />
-                </div>
-                <div
-                    className={cn(
-                        "flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold shadow-sm border",
-                        trendPositive
-                            ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-                            : "bg-red-500/10 text-red-400 border-red-500/20"
-                    )}
-                >
-                    {trendDirection === "up" ? (
-                        <TrendingUp className="h-3.5 w-3.5" />
-                    ) : (
-                        <TrendingDown className="h-3.5 w-3.5" />
-                    )}
-                    {trendDirection === "up" ? "+" : "-"}{Math.abs(trend)}%
+                <div className="flex h-10 w-10 items-center justify-center rounded-md bg-secondary/50 border border-border">
+                    <IconComponent className="h-5 w-5 text-muted-foreground" />
                 </div>
             </div>
-            <div className="mt-5">
-                <p className="text-4xl font-bold text-foreground tracking-tight drop-shadow-sm">
+            <div className="mt-6">
+                <p className="text-3xl font-bold text-foreground tracking-tight">
                     {value.toLocaleString()}
                 </p>
-                <p className="mt-1.5 text-sm font-medium text-slate-400">{label}</p>
+                <p className="mt-1 text-sm font-medium text-muted-foreground">{label}</p>
             </div>
         </div>
     );

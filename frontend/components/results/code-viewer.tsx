@@ -45,31 +45,26 @@ export function CodeViewer({
     };
 
     return (
-        <div className={cn("relative group rounded-xl overflow-hidden border border-slate-800 bg-[#0f172a] shadow-inner", className)}>
-            <div className="absolute top-0 left-0 w-full h-10 bg-slate-900/50 border-b border-slate-800 flex items-center justify-between px-4 z-10">
+        <div className={cn("relative group rounded-md overflow-hidden border border-border bg-[#0d0d0f]", className)}>
+            <div className="absolute top-0 left-0 w-full h-9 bg-black/40 border-b border-border flex items-center justify-between px-3 z-10">
                 <div className="flex items-center gap-2">
-                    <div className="flex gap-1.5">
-                        <div className="w-3 h-3 rounded-full bg-red-500/20 border border-red-500/50"></div>
-                        <div className="w-3 h-3 rounded-full bg-yellow-500/20 border border-yellow-500/50"></div>
-                        <div className="w-3 h-3 rounded-full bg-green-500/20 border border-green-500/50"></div>
-                    </div>
-                    <span className="text-xs font-mono text-slate-500 ml-2">{language}</span>
+                    <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider">{language}</span>
                 </div>
                 <button
                     type="button"
                     onClick={handleCopy}
-                    className="flex h-7 w-7 items-center justify-center rounded bg-slate-800 border border-slate-700 text-slate-400 hover:text-foreground hover:bg-slate-700 transition-all opacity-0 group-hover:opacity-100"
+                    className="flex h-6 w-6 items-center justify-center rounded bg-secondary border border-border text-muted-foreground hover:text-foreground hover:bg-secondary/70 transition-colors opacity-0 group-hover:opacity-100"
                     title="Copy code"
                 >
                     {copied ? (
-                        <Check className="h-3.5 w-3.5 text-emerald-400" />
+                        <Check className="h-3 w-3 text-primary" />
                     ) : (
-                        <Copy className="h-3.5 w-3.5" />
+                        <Copy className="h-3 w-3" />
                     )}
                 </button>
             </div>
 
-            <div className="pt-10">
+            <div className="pt-9">
                 <SyntaxHighlighter
                     language={language}
                     style={vscDarkPlus}
@@ -79,12 +74,12 @@ export function CodeViewer({
                         const isHighlighted = highlightLine && lineNumber === highlightLine;
                         const style: React.CSSProperties = {
                             display: "block",
-                            backgroundColor: isHighlighted ? "rgba(239, 68, 68, 0.15)" : "transparent",
-                            borderLeft: isHighlighted ? "3px solid #ef4444" : "3px solid transparent",
+                            backgroundColor: isHighlighted ? "rgba(239, 68, 68, 0.1)" : "transparent",
+                            borderLeft: isHighlighted ? "2px solid #ef4444" : "2px solid transparent",
                             paddingLeft: "12px",
                             paddingRight: "16px",
                         };
-                        return { style, className: isHighlighted ? "bg-red-500/10" : "" };
+                        return { style, className: isHighlighted ? "bg-destructive/10" : "" };
                     }}
                     customStyle={{
                         margin: 0,

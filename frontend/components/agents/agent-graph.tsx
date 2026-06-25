@@ -49,40 +49,36 @@ function AgentNodeComponent({ data }: { data: AgentNodeData }) {
     return (
         <div
             className={cn(
-                "glass-card rounded-xl px-5 py-4 min-w-[180px] text-center transition-all duration-300 hover:-translate-y-1 hover:shadow-xl bg-[#0f172a] border-2",
-                // Base colors by type (fallback if idle)
-                state === "idle" && data.type === "manager" && "border-purple-500/20",
-                state === "idle" && data.type === "analyzer" && "border-blue-500/20",
-                state === "idle" && data.type === "reviewer" && "border-emerald-500/20",
+                "glass-card px-5 py-4 min-w-[180px] text-center transition-all duration-300",
                 // State-based colors
-                state === "idle" && "border-slate-700 opacity-80",
-                state === "running" && "border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.5)] scale-105 bg-[#1e293b]",
-                state === "completed" && "border-emerald-500",
-                state === "failed" && "border-red-500"
+                state === "idle" && "border-border bg-card",
+                state === "running" && "border-primary shadow-[0_0_10px_rgba(16,185,129,0.2)] scale-[1.02] bg-secondary/50",
+                state === "completed" && "border-primary bg-primary/5",
+                state === "failed" && "border-destructive bg-destructive/5"
             )}
         >
             <Handle
                 type="target"
                 position={Position.Top}
-                className="!bg-slate-400 !border-slate-800 !w-3 !h-3"
+                className="!bg-muted-foreground !border-background !w-2.5 !h-2.5"
             />
-            <div className="flex flex-col items-center gap-2.5">
+            <div className="flex flex-col items-center gap-2">
                 <div
                     className={cn(
-                        "flex h-12 w-12 items-center justify-center rounded-full border shadow-inner transition-colors duration-300",
-                        state === "idle" && "bg-slate-800 border-slate-700",
-                        state === "running" && "bg-blue-500/20 border-blue-500/50",
-                        state === "completed" && "bg-emerald-500/20 border-emerald-500/50",
-                        state === "failed" && "bg-red-500/20 border-red-500/50"
+                        "flex h-10 w-10 items-center justify-center rounded-md border transition-colors duration-300",
+                        state === "idle" && "bg-secondary border-border",
+                        state === "running" && "bg-primary/20 border-primary/50",
+                        state === "completed" && "bg-primary/20 border-primary/50",
+                        state === "failed" && "bg-destructive/20 border-destructive/50"
                     )}
                 >
                     <IconComp
                         className={cn(
-                            "h-6 w-6 transition-colors duration-300",
-                            state === "idle" && "text-slate-400",
-                            state === "running" && "text-blue-400 animate-pulse",
-                            state === "completed" && "text-emerald-400",
-                            state === "failed" && "text-red-400"
+                            "h-5 w-5 transition-colors duration-300",
+                            state === "idle" && "text-muted-foreground",
+                            state === "running" && "text-primary animate-pulse",
+                            state === "completed" && "text-primary",
+                            state === "failed" && "text-destructive"
                         )}
                     />
                 </div>
@@ -93,10 +89,10 @@ function AgentNodeComponent({ data }: { data: AgentNodeData }) {
                     <span
                         className={cn(
                             "text-[10px] uppercase tracking-wider font-bold",
-                            state === "idle" && "text-slate-500",
-                            state === "running" && "text-blue-400",
-                            state === "completed" && "text-emerald-400",
-                            state === "failed" && "text-red-400"
+                            state === "idle" && "text-muted-foreground",
+                            state === "running" && "text-primary",
+                            state === "completed" && "text-primary",
+                            state === "failed" && "text-destructive"
                         )}
                     >
                         {state === "idle" && data.type}
@@ -107,7 +103,7 @@ function AgentNodeComponent({ data }: { data: AgentNodeData }) {
             <Handle
                 type="source"
                 position={Position.Bottom}
-                className="!bg-slate-400 !border-slate-800 !w-3 !h-3"
+                className="!bg-muted-foreground !border-background !w-2.5 !h-2.5"
             />
         </div>
     );
@@ -224,7 +220,7 @@ export function AgentGraph({ nodeStates = {} }: AgentGraphProps) {
     }, []);
 
     return (
-        <div className="h-full min-h-[360px] w-full rounded-xl overflow-hidden border border-slate-800 bg-[#020617] shadow-inner">
+        <div className="h-full min-h-[360px] w-full rounded-lg overflow-hidden border border-border bg-background">
             <ReactFlow
                 nodes={nodes}
                 edges={edges}
@@ -233,16 +229,16 @@ export function AgentGraph({ nodeStates = {} }: AgentGraphProps) {
                 fitView
                 fitViewOptions={{ padding: 0.3 }}
                 proOptions={{ hideAttribution: true }}
-                className="bg-[#020617]"
+                className="bg-background"
             >
                 <Background
                     variant={BackgroundVariant.Dots}
                     gap={20}
                     size={1.5}
-                    color="#334155"
+                    color="#27272A" /* zinc-800 */
                 />
                 <Controls
-                    className="!bg-slate-800 !border-slate-700 !rounded-lg !shadow-lg [&>button]:!bg-slate-800 [&>button]:!border-slate-700 [&>button]:!text-slate-300 [&>button:hover]:!bg-slate-700"
+                    className="!bg-card !border-border !rounded-md !shadow-sm [&>button]:!bg-card [&>button]:!border-border [&>button]:!text-muted-foreground [&>button:hover]:!bg-secondary [&>button:hover]:!text-foreground"
                 />
             </ReactFlow>
         </div>

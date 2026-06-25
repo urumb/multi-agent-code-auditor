@@ -34,11 +34,11 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-[radial-gradient(circle_at_top,_#1e293b,_#020617)]`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background`}
       >
         <div className="flex h-screen bg-background overflow-hidden">
           <Sidebar />
-          <main className="flex-1 overflow-y-auto flex flex-col">
+          <main className="flex-1 overflow-y-auto flex flex-col bg-background relative">
             <Header />
             <div className="p-8 w-full max-w-7xl mx-auto">
               <PageTransition>{children}</PageTransition>
@@ -49,9 +49,9 @@ export default function RootLayout({
           position="bottom-right"
           toastOptions={{
             style: {
-              background: "#1e293b", /* slate-800 */
-              border: "1px solid #334155", /* slate-700 */
-              color: "#f8fafc", /* slate-50 */
+              background: "#18181B", /* zinc-900 */
+              border: "1px solid #27272A", /* zinc-800 */
+              color: "#FAFAFA", /* zinc-50 */
             },
           }}
         />
