@@ -11,7 +11,11 @@ class ManagerAgent:
         """
         Splits Python code into functions and classes using AST.
         Falls back to simple chunking if AST fails (non-python).
+        Doesn't split very small snippets to save time.
         """
+        if len(code) < 500:
+            return [code]
+
         try:
             tree = ast.parse(code)
             chunks = []
@@ -25,9 +29,6 @@ class ManagerAgent:
                     chunk = "\n".join(lines[start:end])
                     chunks.append(chunk)
                 else:
-                    # For top-level code or imports, we might group them or ignore?
-                    # Let's simple capture them as "Main Body" if important, 
-                    # but for now, let's focus on functions/classes which are usually the unit of audit.
                     pass
             
             # If no functions/classes found, treat whole file as one chunk

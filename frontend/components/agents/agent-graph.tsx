@@ -130,25 +130,25 @@ const initialNodes: Node[] = [
         id: "security",
         type: "agent",
         position: { x: 50, y: 180 },
-        data: { label: "Security Agent", type: "analyzer", icon: "shield", state: "idle" },
+        data: { label: "Security Agent", type: "analyzer", icon: "shield" },
     },
     {
         id: "performance",
         type: "agent",
         position: { x: 300, y: 180 },
-        data: { label: "Performance Agent", type: "analyzer", icon: "gauge", state: "idle" },
+        data: { label: "Performance Agent", type: "analyzer", icon: "gauge" },
     },
     {
         id: "code-quality",
         type: "agent",
         position: { x: 550, y: 180 },
-        data: { label: "Code Quality Agent", type: "analyzer", icon: "code", state: "idle" },
+        data: { label: "Quality Agent", type: "analyzer", icon: "code" },
     },
     {
         id: "reviewer",
         type: "agent",
         position: { x: 300, y: 380 },
-        data: { label: "Reviewer Agent", type: "reviewer", icon: "bot", state: "idle" },
+        data: { label: "Reviewer Agent", type: "reviewer", icon: "bot" },
     },
 ];
 

@@ -7,19 +7,78 @@ import { toast } from "sonner";
 /**
  * Settings page for configuring API endpoint and platform preferences.
  */
+import { useEffect } from "react";
+
 export default function SettingsPage() {
     const [apiUrl, setApiUrl] = useState("http://localhost:8000");
-    const [model, setModel] = useState("deepseek-r1:8b");
+    const [model, setModel] = useState("llama3.2");
     const [autoRetry, setAutoRetry] = useState(true);
+    const [ollamaStatus, setOllamaStatus] = useState<"checking" | "ok" | "error">("checking");
 
-    const handleSave = () => {
-        toast.success("Settings saved");
+    const checkOllamaConnection = async () => {
+        setOllamaStatus("checking");
+        try {
+            // We'll test against the backend health check to confirm backend is up.
+            // In a real app we might have a specific endpoint to test ollama.
+            const url = localStorage.getItem("apiUrl") || "http://localhost:8000";
+            const response = await fetch(`${url}/settings/ollama`);
+            if (response.ok) {
+                setOllamaStatus("ok");
+            } else {
+                setOllamaStatus("error");
+            }
+        } catch {
+            setOllamaStatus("error");
+        }
+    };
+
+    useEffect(() => {
+        // Test Ollama connection initially
+        checkOllamaConnection();
+    }, []);
+
+    useEffect(() => {
+        // Load settings from localStorage
+        const storedApiUrl = localStorage.getItem("apiUrl");
+        if (storedApiUrl && storedApiUrl !== apiUrl) setApiUrl(storedApiUrl);
+
+        const storedModel = localStorage.getItem("model");
+        if (storedModel && storedModel !== model) setModel(storedModel);
+
+        const storedAutoRetry = localStorage.getItem("autoRetry");
+        if (storedAutoRetry !== null) {
+            const isRetry = storedAutoRetry === "true";
+            if (isRetry !== autoRetry) setAutoRetry(isRetry);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    const handleSave = async () => {
+        localStorage.setItem("apiUrl", apiUrl);
+        localStorage.setItem("model", model);
+        localStorage.setItem("autoRetry", String(autoRetry));
+
+        try {
+            // Post settings to backend
+            await fetch(`${apiUrl}/settings`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ model })
+            });
+            toast.success("Settings saved");
+            checkOllamaConnection();
+        } catch {
+            toast.error("Settings saved locally, but failed to sync with backend.");
+        }
     };
 
     const handleReset = () => {
         setApiUrl("http://localhost:8000");
-        setModel("deepseek-r1:8b");
+        setModel("llama3.2");
         setAutoRetry(true);
+        localStorage.removeItem("apiUrl");
+        localStorage.removeItem("model");
+        localStorage.removeItem("autoRetry");
         toast.info("Settings reset to defaults");
     };
 
@@ -67,6 +126,14 @@ export default function SettingsPage() {
                     <h3 className="text-sm font-semibold text-foreground">
                         Model Configuration
                     </h3>
+                    <span className={`ml-auto text-xs px-2 py-1 rounded-full font-medium ${
+                        ollamaStatus === "ok" ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" :
+                        ollamaStatus === "error" ? "bg-red-500/10 text-red-400 border border-red-500/20" :
+                        "bg-yellow-500/10 text-yellow-400 border border-yellow-500/20"
+                    }`}>
+                        {ollamaStatus === "ok" ? "Ollama Connected" :
+                         ollamaStatus === "error" ? "Connection Error" : "Checking..."}
+                    </span>
                 </div>
                 <div className="space-y-3">
                     <label className="text-sm font-medium text-foreground" htmlFor="model-select">
@@ -79,6 +146,7 @@ export default function SettingsPage() {
                         className="w-full rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50 transition-all cursor-pointer"
                     >
                         <option value="deepseek-r1:8b">DeepSeek R1 (8B)</option>
+                        <option value="llama3.2">Llama 3.2</option>
                         <option value="llama3:8b">Llama 3 (8B)</option>
                         <option value="codellama:7b">CodeLlama (7B)</option>
                         <option value="mistral:7b">Mistral (7B)</option>

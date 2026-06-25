@@ -243,13 +243,25 @@ export async function submitAudit(input: AuditInput): Promise<AuditResultRespons
 }
 
 export async function fetchMetrics(): Promise<MetricData[]> {
-    return [];
+    try {
+        return await apiFetch<MetricData[]>("/metrics");
+    } catch {
+        return [];
+    }
 }
 
 export async function fetchTrendData(): Promise<TrendPoint[]> {
-    return [];
+    try {
+        return await apiFetch<TrendPoint[]>("/trends");
+    } catch {
+        return [];
+    }
 }
 
 export async function fetchRecentAudits(): Promise<RecentAudit[]> {
-    return [];
+    try {
+        return await apiFetch<RecentAudit[]>("/recent-audits");
+    } catch {
+        return [];
+    }
 }

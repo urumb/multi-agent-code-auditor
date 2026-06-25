@@ -20,7 +20,7 @@ const agentColorMap: Record<string, string> = {
     "Manager Agent": "agent-manager",
     "Security Agent": "agent-security",
     "Performance Agent": "agent-performance",
-    "Code Quality Agent": "agent-code-quality",
+    "Quality Agent": "agent-code-quality",
     "Reviewer Agent": "agent-reviewer",
 };
 

@@ -83,10 +83,15 @@ def retrieval_node(state: AuditorState):
     past_audits = []
     
     # Retrieve context for each snippet (limit to top 1 to avoid context overflow)
+    # Only retrieve context once for the entire file to save time (just use the first snippet)
     audit_memory = _get_memory()
-    for snippet in snippets[:5]: # Cap at 5 snippets for performance
-        results = audit_memory.retrieve_similar(snippet, n_results=1)
-        past_audits.extend(results)
+    if snippets:
+        try:
+            results = audit_memory.retrieve_similar(snippets[0], n_results=1)
+            past_audits.extend(results)
+        except Exception as e:
+            print(f"--- Memory: Error Retrieving Context: {e} ---")
+            pass
     
     # Deduplicate
     unique_audits = list(set(past_audits))
