@@ -117,13 +117,23 @@ def _run_audit_job(job_id: str, code_files: List[CodeFile]) -> None:
                     future = executor.submit(_run)
                     output = future.result(timeout=30)
 
+                final_report_str = output.get("final_report", "")
+                risk_score = 0.0
+                try:
+                    report_data = json.loads(final_report_str)
+                    risk_score = report_data.get("risk_score", 0.0)
+                except Exception:
+                    pass
+
                 file_result = {
                     "file_path": file.path,
-                    "final_report": output.get("final_report", ""),
+                    "final_report": final_report_str,
+                    "risk_score": risk_score,
                     "error": None,
                 }
                 results.append(file_result)
 
+                add_job_event(job_id, "risk_update", {"file_path": file.path, "risk_score": risk_score})
                 add_job_event(job_id, "result", file_result)
                 
             except concurrent.futures.TimeoutError:
@@ -131,6 +141,7 @@ def _run_audit_job(job_id: str, code_files: List[CodeFile]) -> None:
                 file_result = {
                     "file_path": file.path,
                     "final_report": "",
+                    "risk_score": 0.0,
                     "error": error_msg,
                 }
                 results.append(file_result)
@@ -145,6 +156,7 @@ def _run_audit_job(job_id: str, code_files: List[CodeFile]) -> None:
                 file_result = {
                     "file_path": file.path,
                     "final_report": "",
+                    "risk_score": 0.0,
                     "error": str(exc),
                 }
                 results.append(file_result)
@@ -162,8 +174,23 @@ def _run_audit_job(job_id: str, code_files: List[CodeFile]) -> None:
                 "total": len(code_files),
             })
 
+
+        # Compute top risk files
+        file_risks = []
+        for res in results:
+            try:
+                if res["risk_score"] > 0:
+                    file_risks.append({"file_path": res["file_path"], "risk_score": res["risk_score"]})
+            except Exception:
+                pass
+
+        file_risks.sort(key=lambda x: x["risk_score"], reverse=True)
+        top_risk_files = file_risks[:5] # e.g. top 5
+
+        # inject top risk files into results so frontend can access them, or emit as a separate event
+        # Here we just emit a final top_risk_files event or include in 'done'
         duration = round(time.time() - start_time, 2)
-        add_job_event(job_id, "done", {"total_files": len(results), "duration": duration})
+        add_job_event(job_id, "done", {"total_files": len(results), "duration": duration, "top_risk_files": top_risk_files})
         job["status"] = "completed"
 
     except Exception as exc:
@@ -240,9 +267,17 @@ def _run_audit_on_files(code_files: List[CodeFile]) -> AuditResultResponse:
         logger.info("[AUDIT] Processing: %s", file.path)
         try:
             output = run_audit_on_code(file.content, repository_file_count=len(code_files))
+            final_report_str = output.get("final_report", "")
+            risk_score = 0.0
+            try:
+                report_data = json.loads(final_report_str)
+                risk_score = report_data.get("risk_score", 0.0)
+            except Exception:
+                pass
             results.append(FileAuditResult(
                 file_path=file.path,
-                final_report=output.get("final_report", ""),
+                final_report=final_report_str,
+                risk_score=risk_score,
             ))
         except Exception as exc:
             logger.error("[AUDIT] Failed for %s: %s", file.path, exc)
@@ -250,6 +285,23 @@ def _run_audit_on_files(code_files: List[CodeFile]) -> AuditResultResponse:
                 file_path=file.path,
                 error=str(exc),
             ))
+
+    # Calculate top risk files across the whole repo and inject into final_report so sync returns it
+    file_risks = []
+    for r in results:
+        if r.risk_score > 0:
+            file_risks.append({"file_path": r.file_path, "risk_score": r.risk_score})
+    file_risks.sort(key=lambda x: x["risk_score"], reverse=True)
+    top_risk_files = file_risks[:5]
+
+    for r in results:
+        if not r.error and r.final_report:
+            try:
+                report_data = json.loads(r.final_report)
+                report_data["top_risk_files"] = top_risk_files
+                r.final_report = json.dumps(report_data)
+            except Exception:
+                pass
 
     logger.info("[AUDIT] Completed — %d file(s) processed", len(results))
 

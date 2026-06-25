@@ -18,10 +18,11 @@ AGENT_LABELS = {
     "manager": "Manager Agent",
     "security": "Security Agent",
     "performance": "Performance Agent",
+    "quality": "Quality Agent",
     "reviewer": "Reviewer Agent",
 }
 
-ENABLED_AGENTS = {"security", "performance", "reviewer"}
+ENABLED_AGENTS = {"security", "performance", "quality", "reviewer"}
 
 
 def _get_memory() -> AuditMemory:
@@ -97,6 +98,11 @@ def security_node(state: AuditorState):
 def performance_node(state: AuditorState):
     return _run_agent_node(state, "performance", performance.run)
 
+from .agents.quality import QualityAgent
+quality = QualityAgent()
+def quality_node(state: AuditorState):
+    return _run_agent_node(state, "quality", quality.run)
+
 def reviewer_node(state: AuditorState):
     return _run_agent_node(state, "reviewer", reviewer.run)
 
@@ -157,15 +163,11 @@ def route_to_planned_agents(state: AuditorState):
         routes.append("security")
     if "performance" in planned:
         routes.append("performance")
+    if "quality" in planned:
+        routes.append("quality")
     return routes or ["finalize"]
 
-def route_after_security(state: AuditorState):
-    planned = _planned_agents(state)
-    if "reviewer" in planned:
-        return "reviewer"
-    return "finalize"
-
-def route_after_performance(state: AuditorState):
+def route_after_analysis(state: AuditorState):
     if "reviewer" in _planned_agents(state):
         return "reviewer"
     return "finalize"
@@ -177,6 +179,7 @@ builder.add_node("manager", manager_node)
 builder.add_node("retrieve", retrieval_node)
 builder.add_node("security", security_node)
 builder.add_node("performance", performance_node)
+builder.add_node("quality", quality_node)
 builder.add_node("reviewer", reviewer_node)
 builder.add_node("finalize", finalize_node)
 builder.add_node("save", save_node)
@@ -190,13 +193,18 @@ builder.add_conditional_edges("manager", route_after_manager, {
 builder.add_conditional_edges("retrieve", route_to_planned_agents, {
     "security": "security",
     "performance": "performance",
+    "quality": "quality",
     "finalize": "finalize",
 })
-builder.add_conditional_edges("security", route_after_security, {
+builder.add_conditional_edges("security", route_after_analysis, {
     "reviewer": "reviewer",
     "finalize": "finalize",
 })
-builder.add_conditional_edges("performance", route_after_performance, {
+builder.add_conditional_edges("performance", route_after_analysis, {
+    "reviewer": "reviewer",
+    "finalize": "finalize",
+})
+builder.add_conditional_edges("quality", route_after_analysis, {
     "reviewer": "reviewer",
     "finalize": "finalize",
 })

@@ -49,7 +49,7 @@ export function MetricCard({
     className,
 }: MetricCardProps) {
     const IconComponent = iconMap[icon] ?? FolderGit2;
-    const isPositiveTrend = trendDirection === "down" && icon === "shield-alert";
+    // const isPositiveTrend = trendDirection === "down" && icon === "shield-alert";
     const trendPositive =
         (trendDirection === "up" && icon !== "shield-alert" && icon !== "bug") ||
         (trendDirection === "down" && (icon === "shield-alert" || icon === "bug"));

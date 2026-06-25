@@ -61,10 +61,12 @@ class FileAuditResult(BaseModel):
         file_path: Path or identifier of the audited file.
         final_report: Markdown audit report (empty string if error).
         error: Error message if the audit failed for this file.
+        risk_score: Computed risk score.
     """
 
     file_path: str
     final_report: str = ""
+    risk_score: float = 0.0
     error: Optional[str] = None
 
 

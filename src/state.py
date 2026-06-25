@@ -17,6 +17,7 @@ class AuditorState(TypedDict):
     # Analysis results from agents, mapped by snippet index or ID
     security_analysis: List[Dict[str, Any]] 
     performance_analysis: List[Dict[str, Any]]
+    quality_analysis: List[Dict[str, Any]]
     
     # Context retrieved from memory (ChromaDB)
     past_audits: List[str]

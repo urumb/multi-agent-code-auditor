@@ -16,6 +16,7 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 export interface FileAuditResult {
     file_path: string;
     final_report: string;
+    risk_score?: number;
     error: string | null;
 }
 

@@ -69,6 +69,11 @@ export function IssueCard({ finding, index = 0 }: IssueCardProps) {
                             <span className="text-xs text-muted-foreground font-mono">
                                 {finding.file}:{finding.line}
                             </span>
+                            {finding.cwe && (
+                                <span className="ml-2 inline-flex items-center rounded-md bg-muted px-2 py-1 text-xs font-medium text-muted-foreground ring-1 ring-inset ring-border">
+                                    {finding.cwe}
+                                </span>
+                            )}
                         </div>
                     </div>
                     <button
@@ -98,7 +103,7 @@ export function IssueCard({ finding, index = 0 }: IssueCardProps) {
                             Current Code
                         </p>
                         <CodeViewer
-                            code={finding.codeSnippet}
+                            code={finding.before_code || finding.codeSnippet}
                             language="python"
                             highlightLine={1}
                         />
@@ -133,7 +138,7 @@ export function IssueCard({ finding, index = 0 }: IssueCardProps) {
                                 )}
                             </button>
                         </div>
-                        <CodeViewer code={finding.suggestedFix} language="python" />
+                        <CodeViewer code={finding.after_code || finding.suggestedFix} language="python" />
                     </div>
                 </div>
             )}

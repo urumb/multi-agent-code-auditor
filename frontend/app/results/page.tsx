@@ -7,6 +7,8 @@ import Link from "next/link";
 import jsPDF from "jspdf";
 import { toast } from "sonner";
 import type { AuditResultResponse, FileAuditResult } from "@/lib/api";
+import { cn } from "@/lib/utils";
+import { ResultTabs } from "@/components/results/result-tabs";
 
 /**
  * Results page displaying per-file audit reports from the backend.
@@ -218,6 +220,16 @@ export default function ResultsPage() {
                                 <span className="text-sm font-medium text-foreground font-mono">
                                     {file.file_path}
                                 </span>
+                                {file.risk_score !== undefined && (
+                                    <span className={cn(
+                                        "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium border",
+                                        file.risk_score >= 7 ? "bg-red-500/10 text-red-400 border-red-500/20" :
+                                        file.risk_score >= 4 ? "bg-yellow-500/10 text-yellow-400 border-yellow-500/20" :
+                                        "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                                    )}>
+                                        Risk Score: {file.risk_score.toFixed(1)}
+                                    </span>
+                                )}
                             </div>
                             {file.error ? (
                                 <span className="inline-flex items-center rounded-full bg-red-500/10 text-red-400 border border-red-500/20 px-2.5 py-0.5 text-xs font-medium">
@@ -238,10 +250,52 @@ export default function ResultsPage() {
                                         {file.error}
                                     </p>
                                 ) : (
-                                    <pre className="text-sm text-muted-foreground whitespace-pre-wrap font-mono leading-relaxed max-h-[600px] overflow-y-auto">
-                                        {file.final_report ||
-                                            "No report generated."}
-                                    </pre>
+                                        (() => {
+                                            try {
+                                                const data = JSON.parse(file.final_report || "{}");
+                                                const findings = data.findings || [];
+                                                const execSummary = data["Executive Summary"] || "";
+                                                const findingsSummary = data["Findings Summary"] || "";
+                                                const topRiskFiles = data["top_risk_files"] || [];
+
+                                                return (
+                                                    <div className="space-y-6">
+                                                        {topRiskFiles.length > 0 && (
+                                                            <div className="bg-red-500/10 border border-red-500/20 p-4 rounded-lg">
+                                                                <h4 className="text-sm font-semibold text-red-400 mb-2">Top Risk Files</h4>
+                                                                <ul className="list-disc list-inside text-sm text-muted-foreground">
+                                                                    {topRiskFiles.map((trf: { file_path: string; risk_score?: number }) => (
+                                                                        <li key={trf.file_path}>{trf.file_path} - Score: {trf.risk_score?.toFixed(1)}</li>
+                                                                    ))}
+                                                                </ul>
+                                                            </div>
+                                                        )}
+                                                        <div>
+                                                            <h4 className="text-sm font-semibold text-foreground mb-2">Executive Summary</h4>
+                                                            <p className="text-sm text-muted-foreground">{execSummary}</p>
+                                                        </div>
+                                                        <div>
+                                                            <h4 className="text-sm font-semibold text-foreground mb-2">Findings Summary</h4>
+                                                            <p className="text-sm text-muted-foreground">{findingsSummary}</p>
+                                                        </div>
+
+                                                        {findings.length > 0 && (
+                                                            <div>
+                                                                <h4 className="text-sm font-semibold text-foreground mb-4 mt-6">Detailed Findings</h4>
+                                                                <ResultTabs findings={findings} />
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            } catch {
+                                                return (
+                                                    <pre className="text-sm text-muted-foreground whitespace-pre-wrap font-mono leading-relaxed max-h-[600px] overflow-y-auto">
+                                                        {file.final_report ||
+                                                            "No report generated."}
+                                                    </pre>
+                                                );
+                                            }
+                                        })()
                                 )}
                             </div>
                         )}

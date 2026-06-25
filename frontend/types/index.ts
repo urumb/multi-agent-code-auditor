@@ -29,6 +29,9 @@ export interface Finding {
     codeSnippet: string;
     suggestedFix: string;
     agent: string;
+    cwe?: string;
+    before_code?: string;
+    after_code?: string;
 }
 
 /** A log entry produced by an agent during an audit. */
