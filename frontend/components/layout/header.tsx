@@ -70,6 +70,7 @@ export function Header() {
             const saved = localStorage.getItem("notifications");
             if (saved) {
                 const parsed = JSON.parse(saved) as Notification[];
+                // eslint-disable-next-line react-hooks/set-state-in-effect
                 setNotifs(parsed);
             }
         } catch {

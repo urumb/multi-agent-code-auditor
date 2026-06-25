@@ -16,9 +16,9 @@ class PerformanceAgent:
             ("system", """You are a Senior Performance Engineer. Analyze the code for inefficient algorithms, unnecessary repeated work, avoidable I/O, memory pressure, blocking operations, and scalability risks.
 
 Return only valid JSON with this exact shape:
-{
+{{
   "findings": [
-    {
+    {{
       "severity": "Critical|High|Medium|Low",
       "issue": "short actionable title",
       "explanation": "why this affects runtime, memory, or scalability",
@@ -26,11 +26,11 @@ Return only valid JSON with this exact shape:
       "before_code": "relevant inefficient code",
       "after_code": "optimized replacement code",
       "cwe": ""
-    }
+    }}
   ]
-}
+}}
 
-If there are no findings, return {"findings": []}."""),
+If there are no findings, return {{"findings": []}}."""),
             ("user", "Code Snippet:\n{code}")
         ])
 

@@ -9,7 +9,7 @@ os.environ["CHROMA_PERSIST_DIRECTORY"] = tempfile.mkdtemp(
 )
 
 from src.agents.manager import ManagerAgent
-from src.graph import route_after_manager, route_after_security, route_to_planned_agents
+from src.graph import route_after_manager, route_after_analysis, route_to_planned_agents
 
 
 class ExecutionPlannerTests(unittest.TestCase):
@@ -28,7 +28,7 @@ class ExecutionPlannerTests(unittest.TestCase):
             "security",
         )
         self.assertEqual(
-            route_after_security({"execution_plan": plan}),
+            route_after_analysis({"execution_plan": plan}),
             "finalize",
         )
 
@@ -37,15 +37,15 @@ class ExecutionPlannerTests(unittest.TestCase):
         plan = self.manager.build_execution_plan(code)
 
         self.assertEqual(plan, {
-            "agents": ["security", "performance", "reviewer"],
+            "agents": ["security", "performance", "quality", "reviewer"],
             "reason": "Medium-sized input",
         })
         self.assertEqual(
             route_to_planned_agents({"execution_plan": plan}),
-            ["security", "performance"],
+            ["security", "performance", "quality"],
         )
         self.assertEqual(
-            route_after_security({"execution_plan": plan}),
+            route_after_analysis({"execution_plan": plan}),
             "reviewer",
         )
 
@@ -54,7 +54,7 @@ class ExecutionPlannerTests(unittest.TestCase):
         plan = self.manager.build_execution_plan(code, repository_file_count=5)
 
         self.assertEqual(plan, {
-            "agents": ["security", "performance", "reviewer"],
+            "agents": ["security", "performance", "quality", "reviewer"],
             "reason": "Large repository input",
         })
 

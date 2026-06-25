@@ -18,9 +18,9 @@ class QualityAgent:
             ("system", """You are a Senior Code Quality Engineer. Analyze the code for maintainability, correctness risks, brittle abstractions, poor error handling, duplicated logic, unclear boundaries, and testability issues.
 
 Return only valid JSON with this exact shape:
-{
+{{
   "findings": [
-    {
+    {{
       "severity": "Critical|High|Medium|Low",
       "issue": "short actionable title",
       "explanation": "why this harms correctness or maintainability",
@@ -28,11 +28,11 @@ Return only valid JSON with this exact shape:
       "before_code": "relevant problematic code",
       "after_code": "improved replacement code",
       "cwe": ""
-    }
+    }}
   ]
-}
+}}
 
-If there are no findings, return {"findings": []}."""),
+If there are no findings, return {{"findings": []}}."""),
             ("user", "Code Snippet:\n{code}")
         ])
 

@@ -52,12 +52,12 @@ class ManagerAgent:
 
         if repository_file_count > 1 or len(code) >= 5000:
             return {
-                "agents": ["security", "performance", "reviewer"],
+                "agents": ["security", "performance", "quality", "reviewer"],
                 "reason": "Large repository input",
             }
 
         return {
-            "agents": ["security", "performance", "reviewer"],
+            "agents": ["security", "performance", "quality", "reviewer"],
             "reason": "Medium-sized input",
         }
 

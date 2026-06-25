@@ -16,9 +16,9 @@ class SecurityAgent:
             ("system", """You are a Senior Security Engineer. Analyze the provided code snippet for security vulnerabilities including OWASP Top 10, SQL injection, XSS, unsafe deserialization, path traversal, auth bypasses, and hardcoded secrets.
 
 Return only valid JSON with this exact shape:
-{
+{{
   "findings": [
-    {
+    {{
       "severity": "Critical|High|Medium|Low",
       "issue": "short actionable title",
       "explanation": "why this is risky in this code",
@@ -26,11 +26,11 @@ Return only valid JSON with this exact shape:
       "before_code": "relevant vulnerable code",
       "after_code": "safer replacement code",
       "cwe": "CWE identifier or empty string"
-    }
+    }}
   ]
-}
+}}
 
-If there are no findings, return {"findings": []}."""),
+If there are no findings, return {{"findings": []}}."""),
             ("user", "Code Snippet:\n{code}")
         ])
 

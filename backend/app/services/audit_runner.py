@@ -53,6 +53,7 @@ def run_audit_on_code(
         "event_callback": event_callback,
         "security_analysis": [],
         "performance_analysis": [],
+        "quality_analysis": [],
         "past_audits": [],
         "final_report": "",
     }
