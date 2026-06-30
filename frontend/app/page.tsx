@@ -22,6 +22,8 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let mounted = true;
+
     async function loadData() {
       try {
         const [metricsData, trends, audits] = await Promise.all([
@@ -29,16 +31,29 @@ export default function DashboardPage() {
           fetchTrendData(),
           fetchRecentAudits(),
         ]);
-        setMetrics(metricsData);
-        setTrendData(trends);
-        setRecentAudits(audits);
-      } finally {
-        setLoading(false);
+        if (mounted) {
+          setMetrics(metricsData);
+          setTrendData(trends);
+          setRecentAudits(audits);
+          setLoading(false);
+        }
+      } catch {
+        if (mounted) {
+          setLoading(false);
+        }
       }
     }
 
     loadData();
+    const interval = setInterval(loadData, 3000);
+
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+    };
   }, []);
+
+  const isInitialLoad = loading && !metrics && trendData.length === 0 && recentAudits.length === 0;
 
   return (
     <div className="space-y-8">
@@ -54,7 +69,7 @@ export default function DashboardPage() {
 
       {/* Metric cards */}
       <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
-        {loading
+        {isInitialLoad
           ? Array.from({ length: 4 }).map((_, i) => (
             <MetricCardSkeleton key={i} />
           ))
@@ -83,7 +98,7 @@ export default function DashboardPage() {
                 action={
                   <Link
                     href="/audit"
-                    className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
+                    className="flex items-center gap-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:opacity-90 transition-opacity"
                   >
                     <Play className="h-4 w-4" />
                     Run Audit
