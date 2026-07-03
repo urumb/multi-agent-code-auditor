@@ -42,12 +42,12 @@ export function IssueCard({ finding, index = 0 }: IssueCardProps) {
     return (
         <div
             className={cn(
-                "glass-card overflow-hidden animate-fade-in group",
+                "glass-card overflow-hidden animate-fade-in group border",
                 finding.severity === "critical"
-                    ? "border-red-500/40 shadow-[0_4px_15px_-3px_rgba(239,68,68,0.1)] hover:border-red-500/60"
+                    ? "border-red-500/20 hover:border-red-500/40"
                     : finding.severity === "warning"
-                        ? "border-yellow-400/40 shadow-[0_4px_15px_-3px_rgba(250,204,21,0.1)] hover:border-yellow-400/60"
-                        : "hover:border-primary/20"
+                        ? "border-yellow-500/20 hover:border-yellow-500/40"
+                        : "border-white/5 hover:border-primary/20"
             )}
             style={{ animationDelay: `${index * 100}ms` }}
         >
@@ -57,7 +57,7 @@ export function IssueCard({ finding, index = 0 }: IssueCardProps) {
                     <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-2">
                             <SeverityBadge severity={finding.severity} />
-                            <span className="text-xs text-muted-foreground">
+                            <span className="text-xs text-zinc-500">
                                 {finding.agent}
                             </span>
                         </div>
@@ -65,12 +65,12 @@ export function IssueCard({ finding, index = 0 }: IssueCardProps) {
                             {finding.title}
                         </h4>
                         <div className="flex items-center gap-1.5 mt-1.5">
-                            <FileCode className="h-3.5 w-3.5 text-muted-foreground" />
-                            <span className="text-xs text-muted-foreground font-mono">
+                            <FileCode className="h-3.5 w-3.5 text-zinc-500" />
+                            <span className="text-xs text-zinc-500 font-mono">
                                 {finding.file}:{finding.line}
                             </span>
                             {finding.cwe && (
-                                <span className="ml-2 inline-flex items-center rounded-md bg-muted px-2 py-1 text-xs font-medium text-muted-foreground ring-1 ring-inset ring-border">
+                                <span className="ml-2 inline-flex items-center rounded-md bg-[#151515] px-2 py-1 text-xs font-medium text-zinc-400 ring-1 ring-inset ring-white/10">
                                     {finding.cwe}
                                 </span>
                             )}
@@ -79,7 +79,7 @@ export function IssueCard({ finding, index = 0 }: IssueCardProps) {
                     <button
                         type="button"
                         onClick={() => setExpanded(!expanded)}
-                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted/30 text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
+                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/5 text-zinc-400 hover:text-foreground hover:bg-white/10 transition-all"
                     >
                         {expanded ? (
                             <ChevronUp className="h-4 w-4" />
@@ -89,17 +89,17 @@ export function IssueCard({ finding, index = 0 }: IssueCardProps) {
                     </button>
                 </div>
 
-                <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
+                <p className="mt-2 text-sm text-zinc-400 leading-relaxed">
                     {finding.description}
                 </p>
             </div>
 
             {/* Expanded content */}
             {expanded && (
-                <div className="border-t border-border px-4 py-4 space-y-4">
+                <div className="border-t border-white/5 px-4 py-4 space-y-4 bg-[#0a0a0a]">
                     {/* Original code */}
                     <div>
-                        <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider">
+                        <p className="text-xs font-medium text-zinc-500 mb-2 uppercase tracking-wider">
                             Current Code
                         </p>
                         <CodeViewer
@@ -112,7 +112,7 @@ export function IssueCard({ finding, index = 0 }: IssueCardProps) {
                     {/* Suggested fix */}
                     <div>
                         <div className="flex items-center justify-between mb-2">
-                            <p className="text-xs font-medium text-emerald-400 uppercase tracking-wider">
+                            <p className="text-xs font-medium text-primary uppercase tracking-wider">
                                 Suggested Fix
                             </p>
                             <button
@@ -121,8 +121,8 @@ export function IssueCard({ finding, index = 0 }: IssueCardProps) {
                                 className={cn(
                                     "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all",
                                     copied
-                                        ? "bg-emerald-500/10 text-emerald-400"
-                                        : "bg-primary/10 text-primary hover:bg-primary/20"
+                                        ? "bg-primary/20 text-primary"
+                                        : "bg-white/5 text-zinc-300 hover:bg-white/10 hover:text-foreground"
                                 )}
                             >
                                 {copied ? (
