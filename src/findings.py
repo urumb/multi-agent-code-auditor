@@ -31,26 +31,46 @@ class Finding(BaseModel):
     agent: str = Field(default="", exclude=False)
 
 
-def _extract_json_object(text: str) -> Any:
-    stripped = text.strip()
-    fenced = re.search(r"```(?:json)?\s*(.*?)```", stripped, re.DOTALL | re.IGNORECASE)
-    if fenced:
-        stripped = fenced.group(1).strip()
-
+def _candidate_json_slice(text: str) -> Any:
+    """Try to parse text as JSON, trimming to the outermost {..} or [..] if needed."""
+    text = text.strip()
+    if not text:
+        return None
     try:
-        return json.loads(stripped)
+        return json.loads(text)
     except json.JSONDecodeError:
         pass
+    for open_ch, close_ch in (("{", "}"), ("[", "]")):
+        start = text.find(open_ch)
+        end = text.rfind(close_ch)
+        if start != -1 and end != -1 and end > start:
+            try:
+                return json.loads(text[start : end + 1])
+            except json.JSONDecodeError:
+                continue
+    return None
 
-    start = stripped.find("{")
-    end = stripped.rfind("}")
-    if start != -1 and end != -1 and end > start:
-        return json.loads(stripped[start : end + 1])
 
-    start = stripped.find("[")
-    end = stripped.rfind("]")
-    if start != -1 and end != -1 and end > start:
-        return json.loads(stripped[start : end + 1])
+def _extract_json_object(text: str) -> Any:
+    """Extract the model's structured JSON answer from free-form LLM output.
+
+    Local models frequently prose-explain before emitting JSON, and often wrap
+    illustrative code snippets in their own ``` fences ahead of the real
+    answer. Preferring the LAST fenced block (and json-tagged fences over
+    generic ones) avoids latching onto an early code example instead of the
+    actual structured response.
+    """
+    stripped = text.strip()
+
+    candidates: List[str] = []
+    candidates.extend(reversed(re.findall(r"```json\s*(.*?)```", stripped, re.DOTALL | re.IGNORECASE)))
+    candidates.extend(reversed(re.findall(r"```[a-zA-Z0-9_+-]*\s*(.*?)```", stripped, re.DOTALL)))
+    candidates.append(stripped)
+
+    for candidate in candidates:
+        result = _candidate_json_slice(candidate)
+        if result is not None:
+            return result
 
     raise json.JSONDecodeError("No JSON object or array found", stripped, 0)
 

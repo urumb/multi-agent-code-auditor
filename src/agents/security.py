@@ -7,11 +7,7 @@ from ..state import AuditorState
 
 class SecurityAgent:
     def __init__(self):
-        self.llm = ChatOllama(
-            base_url=Config.OLLAMA_BASE_URL,
-            model=Config.MODEL_NAME,
-            temperature=0.1
-        )
+        self._llm_cache: dict[str, ChatOllama] = {}
         self.prompt = ChatPromptTemplate.from_messages([
             ("system", """You are a Senior Security Engineer. Analyze the provided code snippet for security vulnerabilities including OWASP Top 10, SQL injection, XSS, unsafe deserialization, path traversal, auth bypasses, and hardcoded secrets.
 
@@ -34,12 +30,28 @@ If there are no findings, return {{"findings": []}}."""),
             ("user", "Code Snippet:\n{code}")
         ])
 
+    def _get_llm(self) -> ChatOllama:
+        """Build (and cache) the Ollama client for the currently configured model.
+
+        Reads Config.MODEL_NAME on every call instead of capturing it once at
+        construction time, so changing the model in Settings takes effect
+        without restarting the backend.
+        """
+        model = Config.MODEL_NAME
+        if model not in self._llm_cache:
+            self._llm_cache[model] = ChatOllama(
+                base_url=Config.OLLAMA_BASE_URL,
+                model=model,
+                temperature=0.1,
+            )
+        return self._llm_cache[model]
+
     def run(self, state: AuditorState) -> AuditorState:
         print("--- Security Agent: Scanning for Vulnerabilities ---")
         snippets = state.get("code_snippets", [])
         results = []
 
-        chain = self.prompt | self.llm
+        chain = self.prompt | self._get_llm()
 
         for i, snippet in enumerate(snippets):
             try:

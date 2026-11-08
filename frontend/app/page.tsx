@@ -3,12 +3,18 @@
 import { useEffect, useState } from "react";
 import { MetricCard } from "@/components/dashboard/metric-card";
 import { MetricCardSkeleton } from "@/components/dashboard/metric-card-skeleton";
-import { TrendChart } from "@/components/dashboard/trend-chart";
+import dynamic from "next/dynamic";
 import { RecentAudits } from "@/components/dashboard/recent-audits";
 import { EmptyState } from "@/components/ui/empty-state";
 import { fetchMetrics, fetchTrendData, fetchRecentAudits } from "@/lib/api";
 import type { MetricData, TrendPoint, RecentAudit } from "@/types";
 import { Play } from "lucide-react";
+
+// Recharts is heavy; load it only when the dashboard actually has data to plot.
+const TrendChart = dynamic(
+  () => import("@/components/dashboard/trend-chart").then((m) => m.TrendChart),
+  { ssr: false, loading: () => <div className="glass-card h-[22rem] animate-pulse" /> }
+);
 import Link from "next/link";
 
 /**
@@ -25,6 +31,9 @@ export default function DashboardPage() {
     let mounted = true;
 
     async function loadData() {
+      // Skip refreshes while the tab isn't visible — no point polling the
+      // backend for a dashboard nobody's looking at.
+      if (document.hidden) return;
       try {
         const [metricsData, trends, audits] = await Promise.all([
           fetchMetrics(),
@@ -45,37 +54,47 @@ export default function DashboardPage() {
     }
 
     loadData();
-    const interval = setInterval(loadData, 3000);
+    const interval = setInterval(loadData, 15000);
+    document.addEventListener("visibilitychange", loadData);
 
     return () => {
       mounted = false;
       clearInterval(interval);
+      document.removeEventListener("visibilitychange", loadData);
     };
   }, []);
 
   const isInitialLoad = loading && !metrics && trendData.length === 0 && recentAudits.length === 0;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-10">
       {/* Page header */}
-      <div>
-        <h1 className="text-2xl font-semibold text-foreground tracking-tight">
-          Dashboard
+      <div className="pt-4">
+        <p className="eyebrow mb-4">Multi-agent code audit</p>
+        <h1>
+          Four agents.<br />
+          <span className="text-muted-foreground">One honest review.</span>
         </h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Overview of your code audit activity and findings.
+        <p className="max-w-xl">
+          Security, performance and quality agents inspect your code, then a
+          reviewer merges their findings into a single report. Runs fully local.
         </p>
+        <Link href="/audit" className="btn-pill mt-7">
+          Start an audit
+          <Play className="h-3.5 w-3.5" />
+        </Link>
       </div>
 
       {/* Metric cards */}
-      <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+      <div className="stagger grid gap-4 md:grid-cols-3">
         {isInitialLoad
-          ? Array.from({ length: 4 }).map((_, i) => (
+          ? Array.from({ length: 3 }).map((_, i) => (
             <MetricCardSkeleton key={i} />
           ))
-          : metrics?.map((metric) => (
+          : metrics?.map((metric, i) => (
             <MetricCard
               key={metric.label}
+              index={i}
               label={metric.label}
               value={metric.value}
               trend={metric.trend}
@@ -86,19 +105,19 @@ export default function DashboardPage() {
       </div>
 
       {/* Charts and recent audits */}
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2">
           {trendData.length > 0 ? (
             <TrendChart data={trendData} />
           ) : (
-            <div className="glass-card rounded-xl p-5">
+            <div className="glass-card p-5">
               <EmptyState
                 title="No trend data"
                 description="Run your first audit to see vulnerability trends."
                 action={
                   <Link
                     href="/audit"
-                    className="flex items-center gap-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:opacity-90 transition-opacity"
+                    className="btn-pill"
                   >
                     <Play className="h-4 w-4" />
                     Run Audit
@@ -112,7 +131,7 @@ export default function DashboardPage() {
           {recentAudits.length > 0 ? (
             <RecentAudits audits={recentAudits} />
           ) : (
-            <div className="glass-card rounded-xl p-5">
+            <div className="glass-card p-5">
               <EmptyState
                 title="No audits yet"
                 description="Run your first scan to see results here."

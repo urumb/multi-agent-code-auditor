@@ -23,6 +23,8 @@ interface MetricCardProps {
     trendDirection: "up" | "down";
     /** Lucide icon name string. */
     icon: string;
+    /** Stagger index for entrance animation. */
+    index?: number;
     /** Additional CSS classes. */
     className?: string;
 }
@@ -36,9 +38,10 @@ const iconMap: Record<string, LucideIcon> = {
 };
 
 /**
- * Dashboard metric card displaying a KPI with trend indicator.
- *
- * @param props - Metric card configuration.
+ * Dashboard metric card displaying a KPI with an optional trend indicator.
+ * The trend badge only renders when there's a real nonzero trend — the
+ * backend doesn't fabricate a percentage when it has no historical basis
+ * for one.
  */
 export function MetricCard({
     label,
@@ -46,46 +49,47 @@ export function MetricCard({
     trend,
     trendDirection,
     icon,
+    index = 0,
     className,
 }: MetricCardProps) {
     const IconComponent = iconMap[icon] ?? FolderGit2;
-    // const isPositiveTrend = trendDirection === "down" && icon === "shield-alert";
     const trendPositive =
         (trendDirection === "up" && icon !== "shield-alert" && icon !== "bug") ||
         (trendDirection === "down" && (icon === "shield-alert" || icon === "bug"));
 
     return (
         <div
-            className={cn(
-                "glass-card rounded-xl p-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl group",
-                className
-            )}
+            className={cn("glass-card p-6", className)}
+            style={{ "--i": index } as React.CSSProperties}
         >
             <div className="flex items-start justify-between">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-800/80 border border-slate-700/50 group-hover:bg-primary/20 group-hover:border-primary/30 transition-all duration-300 shadow-inner">
-                    <IconComponent className="h-6 w-6 text-primary group-hover:scale-110 transition-transform duration-300" />
-                </div>
-                <div
-                    className={cn(
-                        "flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold shadow-sm border",
-                        trendPositive
-                            ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-                            : "bg-red-500/10 text-red-400 border-red-500/20"
-                    )}
-                >
-                    {trendDirection === "up" ? (
-                        <TrendingUp className="h-3.5 w-3.5" />
-                    ) : (
-                        <TrendingDown className="h-3.5 w-3.5" />
-                    )}
-                    {trendDirection === "up" ? "+" : "-"}{Math.abs(trend)}%
-                </div>
+                <p className="eyebrow">{label}</p>
+                <IconComponent className="h-4 w-4 text-muted-foreground" />
+                {trend !== 0 && (
+                    <div
+                        className={cn(
+                            "flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold border",
+                            trendPositive
+                                ? "bg-primary/10 text-primary border-primary/20"
+                                : "bg-red-500/10 text-red-400 border-red-500/20"
+                        )}
+                    >
+                        {trendDirection === "up" ? (
+                            <TrendingUp className="h-3 w-3" />
+                        ) : (
+                            <TrendingDown className="h-3 w-3" />
+                        )}
+                        {trendDirection === "up" ? "+" : "-"}{Math.abs(trend)}%
+                    </div>
+                )}
             </div>
-            <div className="mt-5">
-                <p className="text-4xl font-bold text-foreground tracking-tight drop-shadow-sm">
+            <div className="mt-8">
+                <p
+                    className="text-6xl leading-none tracking-tight text-foreground tabular-nums"
+                    style={{ fontFamily: "var(--font-instrument), Georgia, serif" }}
+                >
                     {value.toLocaleString()}
                 </p>
-                <p className="mt-1.5 text-sm font-medium text-slate-400">{label}</p>
             </div>
         </div>
     );

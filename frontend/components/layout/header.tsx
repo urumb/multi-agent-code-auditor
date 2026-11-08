@@ -1,84 +1,86 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { Bell, Search, ShieldAlert, CheckCircle2, Lightbulb } from "lucide-react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { motion } from "framer-motion";
+import { Bell, ShieldAlert, CheckCircle2, XCircle, ArrowUpRight, Menu, X } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { checkBackendHealth, fetchRecentAudits } from "@/lib/api";
+import type { RecentAudit } from "@/types";
+import { cn } from "@/lib/utils";
 
-/** Notification item shape stored in localStorage. */
-interface Notification {
-    id: number;
-    title: string;
-    description: string;
-    time: string;
-    icon: string; // serialisable key into iconMap
-    iconColor: string;
-    read: boolean;
-}
+const HEALTH_POLL_MS = 20_000;
+const NOTIF_POLL_MS = 30_000;
+const READ_STORAGE_KEY = "readAuditNotifications";
 
-/** Notification icon map for serialisation-safe rendering. */
-const iconMap: Record<string, LucideIcon> = {
-    CheckCircle2,
-    ShieldAlert,
-    Lightbulb,
-};
-
-/** Seed notification data shown on first visit. */
-const seedNotifications: Notification[] = [
-    {
-        id: 1,
-        title: "Audit Completed",
-        description: "Repository: acme/payment-service",
-        time: "2m ago",
-        icon: "CheckCircle2",
-        iconColor: "text-emerald-400",
-        read: false,
-    },
-    {
-        id: 2,
-        title: "Security Warning Detected",
-        description: "Repository: acme/auth-gateway",
-        time: "15m ago",
-        icon: "ShieldAlert",
-        iconColor: "text-red-400",
-        read: false,
-    },
-    {
-        id: 3,
-        title: "New Suggestions Generated",
-        description: "Review your latest audit results.",
-        time: "1h ago",
-        icon: "Lightbulb",
-        iconColor: "text-yellow-400",
-        read: false,
-    },
+const navItems = [
+    { href: "/", label: "Overview" },
+    { href: "/audit", label: "Audit" },
+    { href: "/results", label: "Results" },
+    { href: "/history", label: "History" },
+    { href: "/agents", label: "Agents" },
+    { href: "/settings", label: "Settings" },
 ];
 
+function iconFor(status: RecentAudit["status"]): { Icon: LucideIcon; color: string } {
+    if (status === "failed") return { Icon: XCircle, color: "text-red-400" };
+    if (status === "completed") return { Icon: CheckCircle2, color: "text-primary" };
+    return { Icon: ShieldAlert, color: "text-yellow-400" };
+}
+
+function timeAgo(iso: string): string {
+    const diffMs = Date.now() - new Date(iso).getTime();
+    const mins = Math.max(0, Math.floor(diffMs / 60_000));
+    if (mins < 1) return "just now";
+    if (mins < 60) return `${mins}m ago`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours}h ago`;
+    return `${Math.floor(hours / 24)}d ago`;
+}
+
 /**
- * Top header component with search, notifications, and backend status.
+ * Floating top navigation: wordmark, a pill nav with a sliding active
+ * indicator, notifications from real audit history, a live backend status
+ * dot, and a primary call to action. Polling pauses while the tab is hidden.
  */
 export function Header() {
+    const pathname = usePathname();
     const [isNotifOpen, setIsNotifOpen] = useState(false);
-    // Start with seed data (safe for SSR), then hydrate from localStorage after mount.
-    const [notifs, setNotifs] = useState<Notification[]>(seedNotifications);
+    const [mobileOpen, setMobileOpen] = useState(false);
+    const [audits, setAudits] = useState<RecentAudit[]>([]);
+    const [readIds, setReadIds] = useState<Set<string>>(new Set());
+    const [backendOnline, setBackendOnline] = useState<boolean | null>(null);
     const notifRef = useRef<HTMLDivElement>(null);
 
-    const unreadCount = notifs.filter((n) => !n.read).length;
+    const unreadCount = audits.filter((a) => !readIds.has(a.id)).length;
 
-    /** Hydrate from localStorage after first client render. */
     useEffect(() => {
         try {
-            const saved = localStorage.getItem("notifications");
-            if (saved) {
-                const parsed = JSON.parse(saved) as Notification[];
-                // eslint-disable-next-line react-hooks/set-state-in-effect
-                setNotifs(parsed);
-            }
+            const saved = window.localStorage.getItem(READ_STORAGE_KEY);
+            if (saved) setReadIds(new Set(JSON.parse(saved) as string[]));
         } catch {
-            // ignore parse errors
+            // ignore
         }
     }, []);
 
-    /** Close panel when clicking outside. */
+    const poll = useCallback(async () => {
+        if (document.hidden) return;
+        const [online, recent] = await Promise.all([checkBackendHealth(), fetchRecentAudits()]);
+        setBackendOnline(online);
+        setAudits(recent);
+    }, []);
+
+    useEffect(() => {
+        poll();
+        const a = setInterval(poll, Math.min(HEALTH_POLL_MS, NOTIF_POLL_MS));
+        document.addEventListener("visibilitychange", poll);
+        return () => {
+            clearInterval(a);
+            document.removeEventListener("visibilitychange", poll);
+        };
+    }, [poll]);
+
     useEffect(() => {
         function handleClickOutside(event: MouseEvent) {
             if (notifRef.current && !notifRef.current.contains(event.target as Node)) {
@@ -89,131 +91,176 @@ export function Header() {
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
-    /** Persist notifications to localStorage whenever state changes. */
     useEffect(() => {
-        try {
-            localStorage.setItem("notifications", JSON.stringify(notifs));
-        } catch {
-            // silently ignore storage errors (e.g. private mode)
-        }
-    }, [notifs]);
+        setMobileOpen(false);
+    }, [pathname]);
 
-    /** Mark every notification as read and clear the badge. */
     const markAllAsRead = () => {
-        const updated = notifs.map((n) => ({ ...n, read: true }));
-        setNotifs(updated);
-        // Also write directly so badge clears before the persist effect fires.
+        const ids = new Set(audits.map((a) => a.id));
+        setReadIds(ids);
         try {
-            localStorage.setItem("notifications", JSON.stringify(updated));
+            window.localStorage.setItem(READ_STORAGE_KEY, JSON.stringify([...ids]));
         } catch {
             // ignore
         }
     };
 
+    const isActive = (href: string) =>
+        href === "/" ? pathname === "/" : pathname.startsWith(href);
+
     return (
-        <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center justify-between border-b border-border bg-background/50 backdrop-blur-xl px-6 transition-all duration-200 overflow-visible">
-            {/* Search */}
-            <div className="relative flex-1 max-w-md group">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors duration-200" />
-                <input
-                    type="text"
-                    placeholder="Search audits, files, findings..."
-                    className="w-full rounded-lg border border-white/5 bg-white/5 py-2 pl-10 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 focus:bg-white/10 transition-all duration-200"
-                />
-            </div>
-
-            {/* Right section */}
-            <div className="flex items-center gap-4 ml-4">
-                {/* Notification Bell */}
-                <div className="relative" ref={notifRef}>
-                    <button
-                        type="button"
-                        onClick={() => setIsNotifOpen(!isNotifOpen)}
-                        className="relative flex h-10 w-10 items-center justify-center rounded-lg border border-white/5 bg-white/5 text-muted-foreground hover:text-foreground hover:bg-white/10 hover:border-white/10 hover:shadow-md transition-all duration-200 group"
+        <header className="fixed inset-x-0 top-0 z-50 px-4 pt-4 sm:px-6">
+            <div className="mx-auto flex h-14 max-w-6xl items-center justify-between rounded-full border border-border bg-background/80 pl-5 pr-2 backdrop-blur-md">
+                {/* Wordmark */}
+                <Link href="/" className="flex items-center gap-2.5 shrink-0">
+                    <span className="relative flex h-2.5 w-2.5">
+                        <span className="absolute inline-flex h-full w-full rounded-full bg-primary opacity-60 animate-ping" />
+                        <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-primary" />
+                    </span>
+                    <span
+                        className="text-[1.35rem] leading-none tracking-tight text-foreground"
+                        style={{ fontFamily: "var(--font-instrument), Georgia, serif" }}
                     >
-                        <Bell className="h-4 w-4 group-hover:scale-110 transition-transform duration-200" />
-                        {unreadCount > 0 && (
-                            <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-blue-500 text-[10px] font-bold text-white shadow-sm ring-2 ring-background">
-                                {unreadCount}
-                            </span>
-                        )}
-                    </button>
+                        auditor<span className="text-primary">.</span>
+                    </span>
+                </Link>
 
-                    {/* Notification Dropdown Panel */}
-                    {isNotifOpen && (
-                        <div className="absolute right-0 top-14 z-50 w-80 rounded-xl bg-slate-900/70 backdrop-blur-xl border border-white/10 shadow-2xl">
-                            {/* Glass Overlay Layer */}
-                            <div className="absolute inset-0 bg-black/20 backdrop-blur-xl rounded-xl pointer-events-none" />
+                {/* Desktop nav */}
+                <nav className="hidden items-center gap-0.5 lg:flex">
+                    {navItems.map((item) => {
+                        const active = isActive(item.href);
+                        return (
+                            <Link
+                                key={item.href}
+                                href={item.href}
+                                className={cn(
+                                    "relative rounded-full px-3.5 py-1.5 text-[0.8rem] font-medium transition-colors duration-300",
+                                    active ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+                                )}
+                            >
+                                {active && (
+                                    <motion.span
+                                        layoutId="nav-pill"
+                                        className="absolute inset-0 rounded-full bg-secondary border border-border"
+                                        transition={{ type: "spring", stiffness: 420, damping: 36 }}
+                                    />
+                                )}
+                                <span className="relative">{item.label}</span>
+                            </Link>
+                        );
+                    })}
+                </nav>
 
-                            {/* Content */}
-                            <div className="relative flex flex-col">
-                                {/* Header */}
-                                <div className="px-4 py-3 border-b border-white/10">
-                                    <h3 className="text-sm font-semibold text-white/90">Notifications</h3>
+                {/* Right cluster */}
+                <div className="flex items-center gap-2">
+                    <div
+                        className="hidden items-center gap-2 px-2 sm:flex"
+                        title={backendOnline ? "Backend online" : backendOnline === false ? "Backend offline" : "Checking backend"}
+                    >
+                        <span
+                            className={cn(
+                                "h-1.5 w-1.5 rounded-full transition-colors duration-500",
+                                backendOnline === null ? "bg-muted-foreground" : backendOnline ? "bg-primary" : "bg-red-400"
+                            )}
+                        />
+                        <span className="eyebrow">
+                            {backendOnline === null ? "checking" : backendOnline ? "online" : "offline"}
+                        </span>
+                    </div>
+
+                    <div className="relative" ref={notifRef}>
+                        <button
+                            type="button"
+                            aria-label="Notifications"
+                            onClick={() => setIsNotifOpen((v) => !v)}
+                            className="relative flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground transition-colors duration-300 hover:bg-secondary hover:text-foreground"
+                        >
+                            <Bell className="h-4 w-4" />
+                            {unreadCount > 0 && (
+                                <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-primary ring-2 ring-background" />
+                            )}
+                        </button>
+
+                        {isNotifOpen && (
+                            <div className="page-enter absolute right-0 top-12 z-50 w-80 overflow-hidden rounded-2xl border border-border bg-popover shadow-2xl shadow-black/60">
+                                <div className="border-b border-border px-4 py-3">
+                                    <h3 className="eyebrow">Recent audits</h3>
                                 </div>
-
-                                {/* Scrollable list */}
                                 <div className="max-h-64 overflow-y-auto">
-                                    {notifs.length === 0 ? (
-                                        <p className="px-4 py-6 text-sm text-center text-muted-foreground">
-                                            No notifications
-                                        </p>
+                                    {audits.length === 0 ? (
+                                        <p className="px-4 py-8 text-center text-sm text-muted-foreground">No audits yet</p>
                                     ) : (
-                                        notifs.map((notif, index) => {
-                                            const IconComponent = iconMap[notif.icon] ?? Bell;
+                                        audits.map((audit, index) => {
+                                            const { Icon, color } = iconFor(audit.status);
+                                            const isRead = readIds.has(audit.id);
                                             return (
-                                                <div
-                                                    key={notif.id}
-                                                    className={[
-                                                        "px-4 py-3 rounded-lg hover:bg-white/5 transition-colors cursor-pointer flex gap-3",
-                                                        index !== notifs.length - 1 ? "border-b border-white/5" : "",
-                                                        notif.read ? "opacity-50" : "",
-                                                    ].join(" ")}
+                                                <Link
+                                                    key={audit.id}
+                                                    href={`/history/${audit.id}`}
+                                                    onClick={() => setIsNotifOpen(false)}
+                                                    className={cn(
+                                                        "flex gap-3 px-4 py-3 transition-colors duration-200 hover:bg-secondary",
+                                                        index !== audits.length - 1 && "border-b border-border",
+                                                        isRead && "opacity-50"
+                                                    )}
                                                 >
-                                                    <div className={`mt-0.5 shrink-0 ${notif.iconColor}`}>
-                                                        <IconComponent className="h-4 w-4" />
-                                                    </div>
-                                                    <div>
-                                                        <p className="text-sm font-medium text-foreground leading-tight mb-1">
-                                                            {notif.title}
-                                                        </p>
-                                                        <p className="text-xs text-muted-foreground line-clamp-2">
-                                                            {notif.description}
-                                                        </p>
-                                                        <p className="text-[10px] text-slate-500 mt-1.5 font-medium">
-                                                            {notif.time}
+                                                    <Icon className={cn("mt-0.5 h-4 w-4 shrink-0", color)} />
+                                                    <div className="min-w-0">
+                                                        <p className="truncate text-sm font-medium text-foreground">{audit.repository}</p>
+                                                        <p className="mt-0.5 text-xs text-muted-foreground">
+                                                            {audit.status} · {audit.findings} finding(s) · {timeAgo(audit.date)}
                                                         </p>
                                                     </div>
-                                                </div>
+                                                </Link>
                                             );
                                         })
                                     )}
                                 </div>
-
-                                {/* Sticky Footer */}
-                                <div className="px-4 py-3 border-t border-white/10 text-center">
+                                <div className="border-t border-border px-4 py-2.5 text-center">
                                     <button
                                         type="button"
                                         onClick={markAllAsRead}
-                                        className="text-sm text-blue-400 hover:text-blue-300 transition-colors"
+                                        className="text-xs text-primary transition-opacity hover:opacity-70"
                                     >
                                         Mark all as read
                                     </button>
                                 </div>
                             </div>
-                        </div>
-                    )}
-                </div>
+                        )}
+                    </div>
 
-                {/* Backend Status Indicator */}
-                <div className="flex items-center gap-2 text-sm text-green-400 font-medium bg-white/5 hover:bg-white/10 transition-colors border border-white/10 px-3 py-1.5 rounded-full">
-                    <span className="relative flex h-2 w-2">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-                    </span>
-                    Backend Online
+                    <Link href="/audit" className="btn-pill hidden sm:inline-flex">
+                        Run audit
+                        <ArrowUpRight className="h-3.5 w-3.5" />
+                    </Link>
+
+                    <button
+                        type="button"
+                        aria-label="Menu"
+                        onClick={() => setMobileOpen((v) => !v)}
+                        className="flex h-10 w-10 items-center justify-center rounded-full border border-border text-foreground lg:hidden"
+                    >
+                        {mobileOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+                    </button>
                 </div>
             </div>
+
+            {mobileOpen && (
+                <nav className="page-enter mx-auto mt-2 flex max-w-6xl flex-col rounded-3xl border border-border bg-background/95 p-2 backdrop-blur-md lg:hidden">
+                    {navItems.map((item) => (
+                        <Link
+                            key={item.href}
+                            href={item.href}
+                            className={cn(
+                                "rounded-2xl px-4 py-3 text-sm font-medium transition-colors",
+                                isActive(item.href) ? "bg-secondary text-foreground" : "text-muted-foreground"
+                            )}
+                        >
+                            {item.label}
+                        </Link>
+                    ))}
+                </nav>
+            )}
         </header>
     );
 }

@@ -1,4 +1,6 @@
 # Author: urumb
+import json
+
 from langgraph.graph import StateGraph, START, END
 from .state import AuditorState
 from .agents.manager import ManagerAgent
@@ -6,6 +8,7 @@ from .agents.security import SecurityAgent
 from .agents.performance import PerformanceAgent
 from .agents.reviewer import ReviewerAgent
 from .utils.memory import AuditMemory
+from .findings import collect_findings, compute_risk_score
 
 # Initialize Agents
 manager = ManagerAgent()
@@ -113,25 +116,36 @@ def reviewer_node(state: AuditorState):
 
 def finalize_node(state: AuditorState):
     """
-    Produces a minimal report when the execution plan intentionally skips Reviewer.
+    Produces a structured report when the execution plan intentionally skips
+    Reviewer (e.g. the fast path for small snippets). Uses the same findings
+    schema as the full Reviewer path so the frontend never has to special-case
+    "fast path" results.
     """
     if state.get("final_report"):
         return {}
 
     security_data = state.get("security_analysis", [])
-    sec_text = "\n".join(
-        [
-            f"Snippet {x['snippet_index']}: {x.get('analysis', 'Error: ' + str(x.get('error', 'Unknown')))}"
-            for x in security_data
-        ]
-    )
+    performance_data = state.get("performance_analysis", [])
+    quality_data = state.get("quality_analysis", [])
+
+    all_findings = collect_findings(security_data, performance_data, quality_data)
+    risk_info = compute_risk_score(all_findings)
+
+    if all_findings:
+        summary = f"{len(all_findings)} finding(s) detected by the Security Agent fast path."
+    else:
+        summary = "No issues were detected by the Security Agent fast path."
+
     return {
-        "final_report": (
-            "# Fast Security Audit\n\n"
-            "Execution plan selected the Security Agent only for this small snippet.\n\n"
-            "## Security Analysis\n\n"
-            f"{sec_text or 'No security findings were produced.'}"
-        )
+        "final_report": json.dumps({
+            "Executive Summary": "Fast security scan for a small code snippet — only the Security Agent ran.",
+            "Findings Summary": summary,
+            "risk_score": risk_info["risk_score"],
+            "risk_breakdown": risk_info["risk_breakdown"],
+            "max_severity": risk_info["max_severity"],
+            "findings": all_findings,
+            "top_risk_files": [],
+        })
     }
 
 def save_node(state: AuditorState):

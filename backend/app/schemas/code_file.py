@@ -29,6 +29,7 @@ class AuditRequest(BaseModel):
     input_type: Literal["github", "paste"]
     github_url: Optional[str] = None
     code: Optional[str] = None
+    language: Optional[str] = None
 
     @model_validator(mode="after")
     def validate_fields_for_input_type(self) -> "AuditRequest":
@@ -67,6 +68,7 @@ class FileAuditResult(BaseModel):
     file_path: str
     final_report: str = ""
     risk_score: float = 0.0
+    max_severity: str = "Low"
     error: Optional[str] = None
 
 

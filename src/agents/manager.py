@@ -4,6 +4,15 @@ from typing import Dict, List
 from ..state import AuditorState
 
 class ManagerAgent:
+    # Each snippet costs one LLM call per analysis agent (security,
+    # performance, quality), plus the fixed reviewer call. Uncapped
+    # decomposition on a file with many functions turns into dozens of
+    # sequential local-LLM calls and can blow past any reasonable per-file
+    # timeout. Capping keeps worst-case latency bounded and predictable;
+    # the largest snippets (the most substantial functions/classes) are
+    # kept since they're the most likely to contain real issues.
+    MAX_SNIPPETS = 8
+
     def __init__(self):
         pass
 
@@ -20,7 +29,7 @@ class ManagerAgent:
             tree = ast.parse(code)
             chunks = []
             lines = code.splitlines()
-            
+
             for node in tree.body:
                 if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
                     # Extract the segment
@@ -30,11 +39,14 @@ class ManagerAgent:
                     chunks.append(chunk)
                 else:
                     pass
-            
+
             # If no functions/classes found, treat whole file as one chunk
             if not chunks:
                 return [code]
-                
+
+            if len(chunks) > self.MAX_SNIPPETS:
+                chunks = sorted(chunks, key=len, reverse=True)[: self.MAX_SNIPPETS]
+
             return chunks
 
         except SyntaxError:

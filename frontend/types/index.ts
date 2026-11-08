@@ -3,10 +3,10 @@
  */
 
 /** Possible statuses for an audit run. */
-export type AuditStatus = "idle" | "running" | "completed" | "failed";
+export type AuditStatus = "idle" | "pending" | "running" | "completed" | "failed";
 
-/** Severity levels for findings. */
-export type Severity = "critical" | "warning" | "info";
+/** Severity levels for findings — mirrors the backend's 4-level scale. */
+export type Severity = "critical" | "high" | "medium" | "low";
 
 /** Categories for findings. */
 export type FindingCategory = "security" | "performance" | "code-quality" | "suggestion";
@@ -17,7 +17,9 @@ export type AuditInputMode = "github" | "upload" | "paste";
 /** Supported programming languages for the paste mode. */
 export type ProgrammingLanguage = "python" | "javascript" | "typescript" | "java";
 
-/** A single finding from an audit analysis. */
+/** A single finding from an audit analysis, normalized from the backend's
+ * raw {issue, explanation, suggested_fix, before_code, after_code, agent,
+ * severity, cwe} shape — see lib/findings.ts. */
 export interface Finding {
     id: string;
     category: FindingCategory;
@@ -25,7 +27,10 @@ export interface Finding {
     title: string;
     description: string;
     file: string;
-    line: number;
+    /** Line number, when the backend can provide one (it currently can't —
+     * agents work on decomposed snippets, not raw line ranges). Omitted
+     * from display rather than showing a fabricated value. */
+    line?: number;
     codeSnippet: string;
     suggestedFix: string;
     agent: string;
@@ -67,6 +72,10 @@ export interface RecentAudit {
     date: string;
     status: AuditStatus;
     findings: number;
+    /** Files whose audit errored/timed out, even if the job as a whole
+     * "completed" — distinguishes a genuinely clean result from one where
+     * nothing was actually analyzed. */
+    files_errored?: number;
 }
 
 /** The full result of an audit run. */

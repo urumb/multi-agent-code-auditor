@@ -9,11 +9,7 @@ from ..state import AuditorState
 
 class QualityAgent:
     def __init__(self):
-        self.llm = ChatOllama(
-            base_url=Config.OLLAMA_BASE_URL,
-            model=Config.MODEL_NAME,
-            temperature=0.2
-        )
+        self._llm_cache: dict[str, ChatOllama] = {}
         self.prompt = ChatPromptTemplate.from_messages([
             ("system", """You are a Senior Code Quality Engineer. Analyze the code for maintainability, correctness risks, brittle abstractions, poor error handling, duplicated logic, unclear boundaries, and testability issues.
 
@@ -36,12 +32,22 @@ If there are no findings, return {{"findings": []}}."""),
             ("user", "Code Snippet:\n{code}")
         ])
 
+    def _get_llm(self) -> ChatOllama:
+        model = Config.MODEL_NAME
+        if model not in self._llm_cache:
+            self._llm_cache[model] = ChatOllama(
+                base_url=Config.OLLAMA_BASE_URL,
+                model=model,
+                temperature=0.2,
+            )
+        return self._llm_cache[model]
+
     def run(self, state: AuditorState) -> AuditorState:
         print("--- Quality Agent: Reviewing Maintainability ---")
         snippets = state.get("code_snippets", [])
         results = []
 
-        chain = self.prompt | self.llm
+        chain = self.prompt | self._get_llm()
 
         for i, snippet in enumerate(snippets):
             try:

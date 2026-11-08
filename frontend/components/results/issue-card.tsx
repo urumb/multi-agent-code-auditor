@@ -4,7 +4,13 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import type { Finding } from "@/types";
 import { SeverityBadge } from "./severity-badge";
-import { CodeViewer } from "./code-viewer";
+import dynamic from "next/dynamic";
+
+// Prism highlighter is heavy; load it only when an issue card is expanded.
+const CodeViewer = dynamic(() => import("./code-viewer").then((m) => m.CodeViewer), {
+    ssr: false,
+    loading: () => <div className="h-16 animate-pulse rounded-lg bg-secondary/40" />,
+});
 import { Copy, Check, FileCode, ChevronDown, ChevronUp } from "lucide-react";
 import { toast } from "sonner";
 
@@ -44,10 +50,12 @@ export function IssueCard({ finding, index = 0 }: IssueCardProps) {
             className={cn(
                 "glass-card overflow-hidden animate-fade-in group",
                 finding.severity === "critical"
-                    ? "border-red-500/40 shadow-[0_4px_15px_-3px_rgba(239,68,68,0.1)] hover:border-red-500/60"
-                    : finding.severity === "warning"
-                        ? "border-yellow-400/40 shadow-[0_4px_15px_-3px_rgba(250,204,21,0.1)] hover:border-yellow-400/60"
-                        : "hover:border-primary/20"
+                    ? "border-red-500/40 hover:border-red-500/60"
+                    : finding.severity === "high"
+                        ? "border-orange-400/40 hover:border-orange-400/60"
+                        : finding.severity === "medium"
+                            ? "border-yellow-400/30 hover:border-yellow-400/50"
+                            : "hover:border-primary/20"
             )}
             style={{ animationDelay: `${index * 100}ms` }}
         >
@@ -67,7 +75,8 @@ export function IssueCard({ finding, index = 0 }: IssueCardProps) {
                         <div className="flex items-center gap-1.5 mt-1.5">
                             <FileCode className="h-3.5 w-3.5 text-muted-foreground" />
                             <span className="text-xs text-muted-foreground font-mono">
-                                {finding.file}:{finding.line}
+                                {finding.file}
+                                {finding.line ? `:${finding.line}` : ""}
                             </span>
                             {finding.cwe && (
                                 <span className="ml-2 inline-flex items-center rounded-md bg-muted px-2 py-1 text-xs font-medium text-muted-foreground ring-1 ring-inset ring-border">
@@ -112,7 +121,7 @@ export function IssueCard({ finding, index = 0 }: IssueCardProps) {
                     {/* Suggested fix */}
                     <div>
                         <div className="flex items-center justify-between mb-2">
-                            <p className="text-xs font-medium text-emerald-400 uppercase tracking-wider">
+                            <p className="text-xs font-medium text-primary uppercase tracking-wider">
                                 Suggested Fix
                             </p>
                             <button
@@ -121,7 +130,7 @@ export function IssueCard({ finding, index = 0 }: IssueCardProps) {
                                 className={cn(
                                     "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all",
                                     copied
-                                        ? "bg-emerald-500/10 text-emerald-400"
+                                        ? "bg-primary/10 text-primary"
                                         : "bg-primary/10 text-primary hover:bg-primary/20"
                                 )}
                             >

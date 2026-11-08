@@ -1,6 +1,5 @@
 # Author: urumb
 import chromadb
-from chromadb.config import Settings
 import uuid
 from typing import List
 from ..config import Config

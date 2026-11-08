@@ -7,11 +7,7 @@ from ..state import AuditorState
 
 class PerformanceAgent:
     def __init__(self):
-        self.llm = ChatOllama(
-            base_url=Config.OLLAMA_BASE_URL,
-            model=Config.MODEL_NAME,
-            temperature=0.2
-        )
+        self._llm_cache: dict[str, ChatOllama] = {}
         self.prompt = ChatPromptTemplate.from_messages([
             ("system", """You are a Senior Performance Engineer. Analyze the code for inefficient algorithms, unnecessary repeated work, avoidable I/O, memory pressure, blocking operations, and scalability risks.
 
@@ -34,12 +30,22 @@ If there are no findings, return {{"findings": []}}."""),
             ("user", "Code Snippet:\n{code}")
         ])
 
+    def _get_llm(self) -> ChatOllama:
+        model = Config.MODEL_NAME
+        if model not in self._llm_cache:
+            self._llm_cache[model] = ChatOllama(
+                base_url=Config.OLLAMA_BASE_URL,
+                model=model,
+                temperature=0.2,
+            )
+        return self._llm_cache[model]
+
     def run(self, state: AuditorState) -> AuditorState:
         print("--- Performance Agent: Analyzing Complexity ---")
         snippets = state.get("code_snippets", [])
         results = []
 
-        chain = self.prompt | self.llm
+        chain = self.prompt | self._get_llm()
 
         for i, snippet in enumerate(snippets):
             try:

@@ -17,10 +17,8 @@ interface ProgressIndicatorProps {
  */
 export function ProgressIndicator({ stages }: ProgressIndicatorProps) {
     return (
-        <div className="glass-card rounded-xl p-5">
-            <h3 className="text-sm font-semibold text-foreground mb-5">
-                Audit Progress
-            </h3>
+        <div className="glass-card p-6">
+            <h3 className="eyebrow mb-6">Audit progress</h3>
             <div className="space-y-0">
                 {stages.map((stage, index) => (
                     <div key={stage.id} className="flex items-start gap-3">
@@ -30,7 +28,7 @@ export function ProgressIndicator({ stages }: ProgressIndicatorProps) {
                                 className={cn(
                                     "flex h-8 w-8 items-center justify-center rounded-full border-2 transition-all duration-300",
                                     stage.status === "completed" &&
-                                    "border-emerald-500 bg-emerald-500/10",
+                                    "border-primary/60 bg-primary/10",
                                     stage.status === "running" &&
                                     "border-primary bg-primary/10",
                                     stage.status === "pending" &&
@@ -40,7 +38,7 @@ export function ProgressIndicator({ stages }: ProgressIndicatorProps) {
                                 )}
                             >
                                 {stage.status === "completed" && (
-                                    <Check className="h-4 w-4 text-emerald-400" />
+                                    <Check className="h-4 w-4 text-primary" />
                                 )}
                                 {stage.status === "running" && (
                                     <Loader2 className="h-4 w-4 text-primary animate-spin" />
@@ -57,7 +55,7 @@ export function ProgressIndicator({ stages }: ProgressIndicatorProps) {
                                     className={cn(
                                         "w-0.5 h-8 transition-colors duration-300",
                                         stage.status === "completed"
-                                            ? "bg-emerald-500/40"
+                                            ? "bg-primary/40"
                                             : "bg-border"
                                     )}
                                 />
@@ -69,7 +67,7 @@ export function ProgressIndicator({ stages }: ProgressIndicatorProps) {
                             <p
                                 className={cn(
                                     "text-sm font-medium transition-colors duration-300",
-                                    stage.status === "completed" && "text-emerald-400",
+                                    stage.status === "completed" && "text-foreground",
                                     stage.status === "running" && "text-primary",
                                     stage.status === "pending" && "text-muted-foreground",
                                     stage.status === "error" && "text-red-400"

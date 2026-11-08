@@ -7,7 +7,23 @@
 
 import type { AuditInput, MetricData, TrendPoint, RecentAudit } from "@/types";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+const DEFAULT_API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+
+/**
+ * Resolves the backend API base URL, preferring a user override saved from
+ * the Settings page (localStorage "apiUrl") over the build-time env default.
+ * Read at call time (not module load) so a Settings change takes effect
+ * immediately without a page reload.
+ */
+export function getApiBase(): string {
+    if (typeof window === "undefined") return DEFAULT_API_BASE;
+    try {
+        const stored = window.localStorage.getItem("apiUrl");
+        return stored && stored.trim().length > 0 ? stored.trim().replace(/\/+$/, "") : DEFAULT_API_BASE;
+    } catch {
+        return DEFAULT_API_BASE;
+    }
+}
 
 /* ------------------------------------------------------------------ */
 /*  Types matching the backend responses                                */
@@ -17,10 +33,38 @@ export interface FileAuditResult {
     file_path: string;
     final_report: string;
     risk_score?: number;
+    max_severity?: string;
     error: string | null;
 }
 
 export interface AuditResultResponse {
+    total_files: number;
+    results: FileAuditResult[];
+}
+
+export interface AuditHistoryEntry {
+    id: string;
+    repository: string;
+    date: string;
+    status: "pending" | "running" | "completed" | "failed";
+    findings: number;
+    max_severity: string;
+    duration: number | null;
+    input_type: string;
+    /** Count of files whose individual audit errored/timed out — a job can
+     * be "completed" (the run finished) while every file failed, which
+     * reads very differently from a genuinely clean result. */
+    files_errored: number;
+}
+
+export interface AuditHistoryDetail {
+    id: string;
+    repository: string;
+    status: string;
+    input_type: string;
+    created_at: number;
+    duration: number | null;
+    error: string | null;
     total_files: number;
     results: FileAuditResult[];
 }
@@ -64,7 +108,7 @@ export interface StreamCallbacks {
 /* ------------------------------------------------------------------ */
 
 async function apiFetch<T>(endpoint: string, options?: RequestInit): Promise<T> {
-    const response = await fetch(`${API_BASE}${endpoint}`, {
+    const response = await fetch(`${getApiBase()}${endpoint}`, {
         ...options,
     });
 
@@ -95,12 +139,28 @@ export async function startAuditJob(input: AuditInput): Promise<{ job_id: string
         body.github_url = input.githubUrl;
     } else if (input.mode === "paste" && input.code) {
         body.code = input.code;
+        if (input.language) body.language = input.language;
     }
 
     return apiFetch<{ job_id: string }>("/audit/stream", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
+    });
+}
+
+/**
+ * Starts a file-upload audit in the background (with the same live SSE
+ * progress as GitHub/paste) and returns a job_id.
+ */
+export async function startUploadJob(files: File[]): Promise<{ job_id: string }> {
+    const formData = new FormData();
+    for (const file of files) {
+        formData.append("files", file);
+    }
+    return apiFetch<{ job_id: string }>("/audit/stream/upload", {
+        method: "POST",
+        body: formData,
     });
 }
 
@@ -120,7 +180,7 @@ export async function subscribeToAuditJob(
 ): Promise<void> {
     let response: Response;
     try {
-        response = await fetch(`${API_BASE}/audit/stream/${jobId}`, {
+        response = await fetch(`${getApiBase()}/audit/stream/${jobId}`, {
             method: "GET",
         });
     } catch {
@@ -233,6 +293,7 @@ export async function submitAudit(input: AuditInput): Promise<AuditResultRespons
         body.github_url = input.githubUrl;
     } else if (input.mode === "paste" && input.code) {
         body.code = input.code;
+        if (input.language) body.language = input.language;
     }
 
     return apiFetch<AuditResultResponse>("/audit", {
@@ -263,5 +324,22 @@ export async function fetchRecentAudits(): Promise<RecentAudit[]> {
         return await apiFetch<RecentAudit[]>("/recent-audits");
     } catch {
         return [];
+    }
+}
+
+export async function fetchAuditHistory(limit = 20, offset = 0): Promise<AuditHistoryEntry[]> {
+    return apiFetch<AuditHistoryEntry[]>(`/audit/history?limit=${limit}&offset=${offset}`);
+}
+
+export async function fetchAuditHistoryDetail(jobId: string): Promise<AuditHistoryDetail> {
+    return apiFetch<AuditHistoryDetail>(`/audit/history/${jobId}`);
+}
+
+export async function checkBackendHealth(): Promise<boolean> {
+    try {
+        const res = await fetch(`${getApiBase()}/health`, { method: "GET" });
+        return res.ok;
+    } catch {
+        return false;
     }
 }

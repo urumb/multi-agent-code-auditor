@@ -12,6 +12,7 @@ env/
 chroma_db/
 chroma/
 *.sqlite3
+audit_history.db
 local_models/
 
 # Frontend & JS
@@ -39,3 +40,34 @@ error.log
 .coverage
 htmlcov/
 .ipynb_checkpoints
+
+# Local databases (audit history lives here - never commit)
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Secrets & local config
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Next.js build artifacts
+frontend/.next/
+frontend/out/
+frontend/next-env.d.ts
+*.tsbuildinfo
+
+# AI-assistant local files (generated per machine)
+.claude/
+CLAUDE.md
+AGENTS.md
+.cursor/
+.agent/
+
+# Exported reports & scratch output
+audit_report*.json
+audit-report*.json
+audit-report*.pdf
+nohup.out

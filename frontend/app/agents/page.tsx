@@ -2,75 +2,56 @@
 
 import dynamic from "next/dynamic";
 
+// React Flow is large: load it lazily, client-side only.
 const AgentGraph = dynamic(
     () => import("@/components/agents/agent-graph").then((mod) => ({ default: mod.AgentGraph })),
     {
         ssr: false,
         loading: () => (
-            <div className="h-[600px] w-full rounded-xl border border-border bg-muted/20 flex items-center justify-center">
-                <p className="text-sm text-muted-foreground">Loading graph...</p>
-            </div>
+            <div className="h-full w-full animate-pulse rounded-xl bg-secondary/40" />
         ),
     }
 );
+
+const agents = [
+    { name: "Manager", description: "Splits code into analyzable snippets and plans which agents run.", dot: "bg-[#b4a2fb]" },
+    { name: "Security", description: "Finds vulnerabilities, injection flaws and exposed secrets.", dot: "bg-[#f58a85]" },
+    { name: "Performance", description: "Spots slow queries, memory leaks and bottlenecks.", dot: "bg-[#f3d36b]" },
+    { name: "Quality", description: "Checks error handling, naming and best practices.", dot: "bg-[#6fc9f2]" },
+    { name: "Reviewer", description: "Merges every finding into one prioritized report.", dot: "bg-primary" },
+];
 
 /**
  * Agents page showing the multi-agent collaboration graph.
  */
 export default function AgentsPage() {
     return (
-        <div className="space-y-8">
-            {/* Page header */}
-            <div>
-                <h1 className="text-2xl font-semibold text-foreground tracking-tight">
-                    Agent Pipeline
-                </h1>
-                <p className="text-sm text-muted-foreground mt-1">
-                    Visualize the multi-agent collaboration workflow.
-                </p>
+        <div className="space-y-10">
+            <div className="pt-4">
+                <p className="eyebrow mb-4">How it works</p>
+                <h1>Agent pipeline</h1>
+                <p>How the agents collaborate on every audit.</p>
             </div>
 
-            {/* Agent descriptions */}
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3">
-                {[
-                    {
-                        name: "Manager Agent",
-                        description: "Decomposes repository into analyzable code snippets",
-                        color: "text-purple-400 bg-purple-500/10 border-purple-500/20",
-                    },
-                    {
-                        name: "Security Agent",
-                        description: "Detects vulnerabilities, injection flaws, and exposed secrets",
-                        color: "text-red-400 bg-red-500/10 border-red-500/20",
-                    },
-                    {
-                        name: "Performance Agent",
-                        description: "Identifies N+1 queries, memory leaks, and bottlenecks",
-                        color: "text-yellow-400 bg-yellow-500/10 border-yellow-500/20",
-                    },
-                    {
-                        name: "Code Quality Agent",
-                        description: "Checks for error handling, naming, and best practices",
-                        color: "text-cyan-400 bg-cyan-500/10 border-cyan-500/20",
-                    },
-                    {
-                        name: "Reviewer Agent",
-                        description: "Aggregates findings and generates remediation suggestions",
-                        color: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
-                    },
-                ].map((agent) => (
+            <div className="stagger grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                {agents.map((agent, i) => (
                     <div
                         key={agent.name}
-                        className={`rounded-xl border p-3 transition-all hover:scale-[1.02] ${agent.color}`}
+                        className="glass-card p-4"
+                        style={{ "--i": i } as React.CSSProperties}
                     >
-                        <p className="text-xs font-semibold">{agent.name}</p>
-                        <p className="text-[11px] mt-1 opacity-70">{agent.description}</p>
+                        <div className="flex items-center gap-2">
+                            <span className={`h-1.5 w-1.5 rounded-full ${agent.dot}`} />
+                            <p className="eyebrow !text-foreground">{agent.name}</p>
+                        </div>
+                        <p className="mt-3 text-[13px] leading-relaxed text-muted-foreground">
+                            {agent.description}
+                        </p>
                     </div>
                 ))}
             </div>
 
-            {/* Graph */}
-            <div className="w-full h-[600px] bg-white/5 backdrop-blur-lg border border-white/10 rounded-xl p-6">
+            <div className="glass-card h-[600px] w-full overflow-hidden p-4">
                 <AgentGraph />
             </div>
         </div>

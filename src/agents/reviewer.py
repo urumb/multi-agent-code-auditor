@@ -6,20 +6,16 @@ from ..state import AuditorState
 
 class ReviewerAgent:
     def __init__(self):
-        self.llm = ChatOllama(
-            base_url=Config.OLLAMA_BASE_URL,
-            model=Config.MODEL_NAME,
-            temperature=0
-        )
+        self._llm_cache: dict[str, ChatOllama] = {}
         self.prompt = ChatPromptTemplate.from_messages([
             ("system", """You are the Lead Code Auditor. Synthesize the findings from the Security, Performance, and Quality teams into a professional JSON report.
-            
+
             Return ONLY valid JSON with this exact shape:
-            {
+            {{
               "Executive Summary": "A high-level overview of the code quality and risks.",
               "Findings Summary": "A short summary of the key findings across all categories."
-            }
-            
+            }}
+
             Do not invent structure.
             """),
             ("user", """
@@ -39,6 +35,16 @@ class ReviewerAgent:
             """)
         ])
 
+    def _get_llm(self) -> ChatOllama:
+        model = Config.MODEL_NAME
+        if model not in self._llm_cache:
+            self._llm_cache[model] = ChatOllama(
+                base_url=Config.OLLAMA_BASE_URL,
+                model=model,
+                temperature=0,
+            )
+        return self._llm_cache[model]
+
     def run(self, state: AuditorState) -> AuditorState:
         print("--- Reviewer Agent: Synthesizing Report ---")
         import json
@@ -56,7 +62,13 @@ class ReviewerAgent:
         qual_text = "\n".join([f"Snippet {x['snippet_index']}: {x.get('analysis', 'Error: ' + str(x.get('error', 'Unknown')))}" for x in quality_data])
         past_text = "\n".join(past_audits) if past_audits else "No similar past audits found."
 
-        chain = self.prompt | self.llm
+        # Computed up front (doesn't depend on the LLM call) so a synthesis
+        # failure below never discards the real findings the other three
+        # agents already produced.
+        all_findings = collect_findings(security_data, performance_data, quality_data)
+        risk_info = compute_risk_score(all_findings)
+
+        chain = self.prompt | self._get_llm()
 
         try:
             response = chain.invoke({
@@ -71,18 +83,16 @@ class ReviewerAgent:
                 report_json = _extract_json_object(response.content)
             except json.JSONDecodeError:
                 report_json = {
-                    "Executive Summary": "Failed to parse LLM output.",
-                    "Findings Summary": "Please review the raw output manually."
+                    "Executive Summary": "Failed to parse the reviewer's synthesis output.",
+                    "Findings Summary": "The findings below are still accurate — only the narrative summary failed to parse.",
                 }
-
-            # Combine all findings to compute risk score
-            all_findings = collect_findings(security_data, performance_data, quality_data)
-            risk_info = compute_risk_score(all_findings)
 
             final_report_dict = {
                 "Executive Summary": report_json.get("Executive Summary", ""),
                 "Findings Summary": report_json.get("Findings Summary", ""),
                 "risk_score": risk_info["risk_score"],
+                "risk_breakdown": risk_info["risk_breakdown"],
+                "max_severity": risk_info["max_severity"],
                 "findings": all_findings,
                 "top_risk_files": [] # Computed higher up if multiple files
             }
@@ -91,8 +101,11 @@ class ReviewerAgent:
             error_msg = f"Error in Reviewer Agent: {str(e)}"
             print(error_msg)
             return {"final_report": json.dumps({
-                "Executive Summary": "Audit Failed",
+                "Executive Summary": "The Reviewer Agent's narrative synthesis failed, but the findings below were still detected.",
                 "Findings Summary": error_msg,
-                "risk_score": 0.0,
+                "risk_score": risk_info["risk_score"],
+                "risk_breakdown": risk_info["risk_breakdown"],
+                "max_severity": risk_info["max_severity"],
+                "findings": all_findings,
                 "top_risk_files": []
             })}

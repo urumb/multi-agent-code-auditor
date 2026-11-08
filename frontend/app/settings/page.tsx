@@ -95,7 +95,7 @@ export default function SettingsPage() {
             </div>
 
             {/* API Configuration */}
-            <div className="glass-card rounded-xl p-5 space-y-4">
+            <div className="glass-card p-5 space-y-4">
                 <div className="flex items-center gap-2">
                     <Server className="h-4 w-4 text-primary" />
                     <h3 className="text-sm font-semibold text-foreground">
@@ -120,14 +120,14 @@ export default function SettingsPage() {
             </div>
 
             {/* Model Configuration */}
-            <div className="glass-card rounded-xl p-6 space-y-4">
+            <div className="glass-card p-6 space-y-4">
                 <div className="flex items-center gap-2">
                     <Brain className="h-4 w-4 text-primary" />
                     <h3 className="text-sm font-semibold text-foreground">
                         Model Configuration
                     </h3>
                     <span className={`ml-auto text-xs px-2 py-1 rounded-full font-medium ${
-                        ollamaStatus === "ok" ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" :
+                        ollamaStatus === "ok" ? "bg-primary/10 text-primary border border-primary/20" :
                         ollamaStatus === "error" ? "bg-red-500/10 text-red-400 border border-red-500/20" :
                         "bg-yellow-500/10 text-yellow-400 border border-yellow-500/20"
                     }`}>
@@ -151,14 +151,14 @@ export default function SettingsPage() {
                         <option value="codellama:7b">CodeLlama (7B)</option>
                         <option value="mistral:7b">Mistral (7B)</option>
                     </select>
-                    <p className="text-xs text-slate-400 mt-2">
+                    <p className="text-xs text-muted-foreground mt-2">
                         This project runs AI models locally using Ollama. The AI analysis pipeline will only work when the backend is running on a machine with Ollama installed and a model downloaded.
                     </p>
                 </div>
             </div>
 
             {/* Preferences */}
-            <div className="glass-card rounded-xl p-5 space-y-4">
+            <div className="glass-card p-5 space-y-4">
                 <div className="flex items-center gap-2">
                     <Palette className="h-4 w-4 text-primary" />
                     <h3 className="text-sm font-semibold text-foreground">
@@ -191,7 +191,7 @@ export default function SettingsPage() {
                 <button
                     type="button"
                     onClick={handleSave}
-                    className="flex items-center gap-2 rounded-lg bg-primary px-6 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90 glow-primary transition-all"
+                    className="flex items-center gap-2 rounded-lg bg-primary px-6 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90 transition-opacity"
                 >
                     <Save className="h-4 w-4" />
                     Save Settings

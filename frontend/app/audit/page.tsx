@@ -3,8 +3,15 @@
 import { AuditForm } from "@/components/audit/audit-form";
 import { ProgressIndicator } from "@/components/audit/progress-indicator";
 import { AgentActivityLog } from "@/components/audit/agent-activity-log";
-import { AgentGraph } from "@/components/agents/agent-graph";
+import dynamic from "next/dynamic";
+
+// React Flow is large - only fetch it once an audit is actually running.
+const AgentGraph = dynamic(
+    () => import("@/components/agents/agent-graph").then((m) => m.AgentGraph),
+    { ssr: false, loading: () => <div className="h-full w-full animate-pulse rounded-xl bg-secondary/40" /> }
+);
 import { useAudit } from "@/hooks/use-audit";
+import { exportAuditAsJson } from "@/lib/export";
 import { toast } from "sonner";
 import { CheckCircle, XCircle, FileCode } from "lucide-react";
 import { useEffect, useRef } from "react";
@@ -30,7 +37,7 @@ export default function AuditPage() {
     useEffect(() => {
         if (prevStatusRef.current === "running" && status === "completed") {
             toast.success("Audit completed successfully", {
-                icon: <CheckCircle className="h-4 w-4 text-emerald-400" />,
+                icon: <CheckCircle className="h-4 w-4 text-primary" />,
             });
         }
         if (prevStatusRef.current === "running" && status === "failed") {
@@ -49,8 +56,9 @@ export default function AuditPage() {
     return (
         <div className="space-y-8">
             {/* Page header */}
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-end justify-between gap-4 pt-4">
                 <div>
+                    <p className="eyebrow mb-4">New audit</p>
                     <h1 className="text-2xl font-semibold text-foreground tracking-tight">
                         Run Audit
                     </h1>
@@ -63,18 +71,8 @@ export default function AuditPage() {
                         {status === "completed" && result && (
                             <button
                                 type="button"
-                                onClick={() => {
-                                    const blob = new Blob([JSON.stringify(result, null, 2)], { type: "application/json" });
-                                    const url = URL.createObjectURL(blob);
-                                    const a = document.createElement("a");
-                                    a.href = url;
-                                    a.download = "audit_report.json";
-                                    document.body.appendChild(a);
-                                    a.click();
-                                    document.body.removeChild(a);
-                                    URL.revokeObjectURL(url);
-                                }}
-                                className="rounded-lg border border-primary/20 bg-primary/10 px-4 py-2 text-sm font-medium text-primary hover:bg-primary/20 transition-all"
+                                onClick={() => exportAuditAsJson(result, "audit_report.json")}
+                                className="btn-pill"
                             >
                                 Export JSON
                             </button>
@@ -82,7 +80,7 @@ export default function AuditPage() {
                         <button
                             type="button"
                             onClick={reset}
-                            className="rounded-lg border border-border bg-muted/30 px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
+                            className="rounded-full border border-border px-4 py-2 text-[0.8125rem] font-medium text-muted-foreground transition-colors duration-300 hover:border-[#34343a] hover:text-foreground"
                         >
                             New Audit
                         </button>
@@ -90,7 +88,7 @@ export default function AuditPage() {
                 )}
             </div>
 
-            <div className="max-w-5xl mx-auto flex flex-col gap-6">
+            <div className="mx-auto flex max-w-5xl flex-col gap-5">
                 {/* Audit form */}
                 <AuditForm onSubmit={handleSubmit} isRunning={status === "running"} />
 
@@ -112,7 +110,7 @@ export default function AuditPage() {
                     <div className="relative">
                         <ProgressIndicator stages={stages} />
                         {status === "completed" && duration && (
-                            <div className="absolute top-5 right-5 text-sm font-medium text-emerald-400 bg-emerald-400/10 px-3 py-1 rounded-full animate-fade-in">
+                            <div className="absolute top-5 right-5 text-sm font-medium text-primary bg-primary/10 px-3 py-1 rounded-full animate-fade-in">
                                 Completed in {duration}s
                             </div>
                         )}
@@ -120,7 +118,7 @@ export default function AuditPage() {
                 )}
 
                 {status !== "idle" && (
-                    <div className="w-full h-[420px] bg-white/5 backdrop-blur-lg border border-white/10 rounded-xl p-4">
+                    <div className="w-full h-[420px] glass-card p-4 overflow-hidden">
                         <AgentGraph nodeStates={agentGraphStates} />
                     </div>
                 )}

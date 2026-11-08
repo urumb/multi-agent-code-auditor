@@ -12,18 +12,26 @@ interface SeverityBadgeProps {
 }
 
 /** Color and label mapping for severity levels. */
-const severityConfig: Record<Severity, { label: string; classes: string }> = {
+const severityConfig: Record<Severity, { label: string; classes: string; dotColor: string }> = {
     critical: {
         label: "Critical",
         classes: "bg-red-500/10 text-red-400 border-red-500/20",
+        dotColor: "bg-red-400",
     },
-    warning: {
-        label: "Warning",
+    high: {
+        label: "High",
+        classes: "bg-orange-500/10 text-orange-400 border-orange-500/20",
+        dotColor: "bg-orange-400",
+    },
+    medium: {
+        label: "Medium",
         classes: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20",
+        dotColor: "bg-yellow-400",
     },
-    info: {
-        label: "Info",
-        classes: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+    low: {
+        label: "Low",
+        classes: "bg-primary/10 text-primary border-primary/20",
+        dotColor: "bg-primary",
     },
 };
 
@@ -33,7 +41,7 @@ const severityConfig: Record<Severity, { label: string; classes: string }> = {
  * @param props - Badge configuration.
  */
 export function SeverityBadge({ severity, className }: SeverityBadgeProps) {
-    const config = severityConfig[severity];
+    const config = severityConfig[severity] ?? severityConfig.low;
 
     return (
         <span
@@ -43,14 +51,7 @@ export function SeverityBadge({ severity, className }: SeverityBadgeProps) {
                 className
             )}
         >
-            <span
-                className={cn(
-                    "h-1.5 w-1.5 rounded-full",
-                    severity === "critical" && "bg-red-400",
-                    severity === "warning" && "bg-yellow-400",
-                    severity === "info" && "bg-emerald-400"
-                )}
-            />
+            <span className={cn("h-1.5 w-1.5 rounded-full", config.dotColor)} />
             {config.label}
         </span>
     );

@@ -30,9 +30,9 @@ interface AuditFormProps {
 
 /** Tab configuration for input modes. */
 const tabs: { mode: AuditInputMode; label: string; icon: React.ElementType }[] = [
-    { mode: "github", label: "GitHub Repository", icon: Github },
-    { mode: "upload", label: "Upload Files", icon: Upload },
-    { mode: "paste", label: "Paste Code", icon: Code },
+    { mode: "github", label: "GitHub", icon: Github },
+    { mode: "upload", label: "Upload", icon: Upload },
+    { mode: "paste", label: "Paste", icon: Code },
 ];
 
 /** Supported programming languages. */
@@ -54,6 +54,14 @@ export function AuditForm({ onSubmit, isRunning }: AuditFormProps) {
     const [files, setFiles] = useState<File[]>([]);
     const [code, setCode] = useState("");
     const [language, setLanguage] = useState<ProgrammingLanguage>("python");
+    const [dragging, setDragging] = useState(false);
+
+    const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        setDragging(false);
+        const dropped = Array.from(e.dataTransfer.files);
+        if (dropped.length) setFiles((prev) => [...prev, ...dropped]);
+    };
 
     const handleSubmit = () => {
         onSubmit({ mode: inputMode, githubUrl, files, code, language });
@@ -62,6 +70,7 @@ export function AuditForm({ onSubmit, isRunning }: AuditFormProps) {
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files) {
             setFiles(Array.from(e.target.files));
+            e.target.value = "";
         }
     };
 
@@ -75,19 +84,19 @@ export function AuditForm({ onSubmit, isRunning }: AuditFormProps) {
         (inputMode === "paste" && code.trim().length > 0);
 
     return (
-        <div className="p-8 rounded-xl backdrop-blur-md bg-white/5 border border-white/10 shadow-xl hover:-translate-y-1 hover:shadow-2xl transition-all duration-200">
+        <div className="glass-card p-6 sm:p-8">
             {/* Mode tabs */}
-            <div className="flex gap-2 mb-6">
+            <div className="mb-8 inline-flex gap-1 rounded-full border border-border bg-background/60 p-1">
                 {tabs.map((tab) => (
                     <button
                         key={tab.mode}
                         type="button"
                         onClick={() => setInputMode(tab.mode)}
                         className={cn(
-                            "flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-all duration-200",
+                            "flex items-center gap-2 rounded-full px-4 py-2 text-[0.8125rem] font-medium transition-all duration-300",
                             inputMode === tab.mode
-                                ? "bg-primary/10 text-primary border border-primary/20"
-                                : "bg-muted/30 text-muted-foreground hover:bg-muted/50 hover:text-foreground border border-transparent"
+                                ? "bg-secondary text-foreground shadow-sm shadow-black/40"
+                                : "text-muted-foreground hover:text-foreground"
                         )}
                     >
                         <tab.icon className="h-4 w-4" />
@@ -99,7 +108,7 @@ export function AuditForm({ onSubmit, isRunning }: AuditFormProps) {
             {/* GitHub URL input */}
             {inputMode === "github" && (
                 <div className="space-y-3">
-                    <label className="text-sm font-medium text-foreground" htmlFor="github-url">
+                    <label className="eyebrow block" htmlFor="github-url">
                         Repository URL
                     </label>
                     <input
@@ -108,7 +117,7 @@ export function AuditForm({ onSubmit, isRunning }: AuditFormProps) {
                         placeholder="https://github.com/user/repo"
                         value={githubUrl}
                         onChange={(e) => setGithubUrl(e.target.value)}
-                        className="w-full rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/50 transition-all"
+                        className="w-full rounded-xl border border-border bg-background/60 px-4 py-3.5 text-sm text-foreground placeholder:text-muted-foreground/60 transition-colors duration-300 focus:border-primary/50 focus:outline-none"
                     />
                 </div>
             )}
@@ -116,23 +125,31 @@ export function AuditForm({ onSubmit, isRunning }: AuditFormProps) {
             {/* File upload */}
             {inputMode === "upload" && (
                 <div className="space-y-3">
-                    <label className="text-sm font-medium text-foreground">
-                        Upload Files
+                    <label className="eyebrow block">
+                        Source files
                     </label>
-                    <div className="relative border-2 border-dashed border-border rounded-lg p-8 text-center hover:border-primary/40 transition-colors">
+                    <div
+                        onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+                        onDragLeave={() => setDragging(false)}
+                        onDrop={handleDrop}
+                        className={cn(
+                            "relative rounded-2xl border border-dashed p-10 text-center transition-all duration-300",
+                            dragging ? "border-primary/70 bg-primary/5" : "border-border hover:border-[#3a3a42]"
+                        )}
+                    >
                         <FileUp className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
                         <p className="text-sm text-muted-foreground mb-2">
                             Drag and drop files here, or click to browse
                         </p>
                         <p className="text-xs text-muted-foreground/70">
-                            ZIP archives or individual source files
+                            ZIP archives or individual source files · up to 20MB
                         </p>
                         <input
                             type="file"
                             multiple
                             onChange={handleFileChange}
                             className="absolute inset-0 opacity-0 cursor-pointer"
-                            accept=".py,.js,.ts,.java,.zip,.jsx,.tsx"
+                            accept=".py,.js,.jsx,.mjs,.ts,.tsx,.java,.c,.cpp,.h,.cs,.go,.rb,.php,.rs,.kt,.swift,.zip"
                         />
                     </div>
                     {files.length > 0 && (
@@ -140,7 +157,7 @@ export function AuditForm({ onSubmit, isRunning }: AuditFormProps) {
                             {files.map((file, index) => (
                                 <div
                                     key={`${file.name}-${index}`}
-                                    className="flex items-center justify-between rounded-lg bg-muted/20 px-3 py-2"
+                                    className="flex items-center justify-between rounded-xl border border-border bg-background/40 px-3.5 py-2.5"
                                 >
                                     <span className="text-sm text-foreground truncate">
                                         {file.name}
@@ -163,13 +180,13 @@ export function AuditForm({ onSubmit, isRunning }: AuditFormProps) {
             {inputMode === "paste" && (
                 <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                        <label className="text-sm font-medium text-foreground" htmlFor="code-input">
-                            Paste Code
+                        <label className="eyebrow" htmlFor="code-input">
+                            Source code
                         </label>
                         <select
                             value={language}
                             onChange={(e) => setLanguage(e.target.value as ProgrammingLanguage)}
-                            className="rounded-lg border border-border bg-muted/30 px-3 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50"
+                            className="rounded-full border border-border bg-background/60 px-3 py-1.5 text-xs text-foreground focus:border-primary/50 focus:outline-none"
                         >
                             {languages.map((lang) => (
                                 <option key={lang.value} value={lang.value}>
@@ -184,7 +201,7 @@ export function AuditForm({ onSubmit, isRunning }: AuditFormProps) {
                         value={code}
                         onChange={(e) => setCode(e.target.value)}
                         rows={12}
-                        className="w-full rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm text-foreground font-mono placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/50 resize-none transition-all"
+                        className="w-full resize-none rounded-xl border border-border bg-background/60 px-4 py-3.5 font-mono text-[13px] leading-relaxed text-foreground placeholder:text-muted-foreground/60 transition-colors duration-300 focus:border-primary/50 focus:outline-none"
                     />
                 </div>
             )}
@@ -195,10 +212,10 @@ export function AuditForm({ onSubmit, isRunning }: AuditFormProps) {
                 onClick={handleSubmit}
                 disabled={!isValid || isRunning}
                 className={cn(
-                    "mt-6 flex w-full items-center justify-center gap-2 rounded-lg px-6 py-3 text-sm font-semibold transition-all duration-200",
+                    "mt-8 flex w-full items-center justify-center gap-2 rounded-full px-6 py-3.5 text-sm font-semibold transition-all duration-300",
                     isValid && !isRunning
-                        ? "bg-primary text-primary-foreground hover:opacity-90 glow-primary"
-                        : "bg-muted text-muted-foreground cursor-not-allowed"
+                        ? "bg-foreground text-background hover:-translate-y-px hover:shadow-[0_10px_30px_-12px_rgba(59,239,140,0.5)] active:scale-[0.99]"
+                        : "cursor-not-allowed bg-secondary text-muted-foreground"
                 )}
             >
                 <Play className="h-4 w-4" />
