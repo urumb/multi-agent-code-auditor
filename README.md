@@ -12,6 +12,7 @@ An AI-powered, multi-agent, local-first code auditing system.
 - 🎨 **Clean, Fast UI**: Dark editorial interface with CSS-driven transitions, lazy-loaded heavy libraries, and no exit-animation lag.
 - ⚡ **Real-Time Streaming**: Live execution tracking via Server-Sent Events (SSE).
 - 📈 **Incremental Results**: Audit results stream into the UI precisely as each file finishes.
+- 🎚️ **Scan Depth**: *Quick* runs only the Security agent (fastest); *Full* runs Security, Performance, Quality and the Reviewer.
 - 🔒 **100% Local Inference**: Powered by Ollama. Your code never leaves your machine.
 - 💸 **Zero Cost**: No API keys, no paid services, no cloud. Everything runs on your own hardware.
 
@@ -139,6 +140,20 @@ npm start
 
 ---
 
+## 🏎️ Performance Notes
+
+Local LLMs are the bottleneck, especially on CPU-only machines (typically ~10 tokens/s). The pipeline is tuned for that:
+
+- Output is length-capped and constrained to JSON, the model is kept loaded between audits and pre-warmed at startup.
+- Small files are analyzed in a single call per agent; larger files are split into ~3000-character chunks (not one call per function).
+- LLM calls take turns instead of competing for the same CPU cores (set `LLM_CONCURRENCY` higher only if you have a GPU).
+- The Reviewer's executive summary is generated instantly from the merged findings. Set `REVIEWER_USE_LLM=true` to have the model write it instead (one extra call per file).
+- Repository audits skip near-empty files and are capped at `MAX_FILES_PER_AUDIT` files per run (default 25).
+
+Rough timings on a laptop CPU with `llama3.2`: Quick ~20-35s per file, Full ~1-2 min per file. For faster audits, use *Quick*, or pull a smaller model (`ollama pull llama3.2:1b`) and select it in Settings. Settings only lists models that are actually installed in Ollama.
+
+---
+
 ## 🩺 Troubleshooting
 
 | Problem | Fix |
@@ -146,6 +161,8 @@ npm start
 | Header shows **offline** | The backend isn't running on port 8000. Start it (step 4). |
 | Audits fail or time out | Make sure Ollama is running (`ollama serve`) and the model is pulled (`ollama pull llama3.2`). |
 | GitHub audit fails immediately | The repo must be public and `git` must be installed. |
+| Audit times out or is slow | Use **Quick** scan depth, a smaller model, or audit fewer files. See *Performance Notes*. |
+| Model not in Settings list | Only installed models are listed. Run `ollama pull <model>`. |
 | UI feels slow | Use `npm run build && npm start` instead of `npm run dev`. |
 
 ---

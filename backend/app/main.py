@@ -2,6 +2,7 @@
 import concurrent.futures
 import json
 import logging
+import os
 import asyncio
 import threading
 import time
@@ -9,7 +10,7 @@ from typing import List
 
 from pydantic import BaseModel
 
-from fastapi import FastAPI, File, UploadFile, BackgroundTasks, HTTPException
+from fastapi import FastAPI, File, Form, UploadFile, BackgroundTasks, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
@@ -51,7 +52,9 @@ PER_FILE_TIMEOUT_SECONDS = 240
 
 # Safety limits on repository/upload size so a single audit request cannot
 # exhaust memory, disk, or run for an unbounded amount of time.
-MAX_FILES_PER_AUDIT = 60
+# Each file costs roughly a minute on a CPU-only machine, so the default cap is
+# modest; raise it via env (MAX_FILES_PER_AUDIT) if you have a GPU.
+MAX_FILES_PER_AUDIT = int(os.getenv("MAX_FILES_PER_AUDIT", "25"))
 
 # ---------------------------------------------------------------------------
 # FastAPI App
@@ -79,12 +82,15 @@ app.add_middleware(
 @app.on_event("startup")
 def _on_startup() -> None:
     db.init_db()
+    # Pre-load the model so the first audit doesn't pay the cold-start cost.
+    from src.llm import warm_up_model
+    warm_up_model()
 
 
 # ---------------------------------------------------------------------------
 # Background Job Execution
 # ---------------------------------------------------------------------------
-def _run_audit_job(job_id: str, code_files: List[CodeFile]) -> None:
+def _run_audit_job(job_id: str, code_files: List[CodeFile], depth: str = "full") -> None:
     """Background task that runs the audit and pushed events to job_store.
 
     Args:
@@ -151,6 +157,7 @@ def _run_audit_job(job_id: str, code_files: List[CodeFile]) -> None:
                         log_callback=log_callback,
                         event_callback=event_callback,
                         repository_file_count=len(code_files),
+                        depth=depth,
                     )
 
                 # Deliberately not a `with` block: ThreadPoolExecutor.__exit__
@@ -275,7 +282,7 @@ def _run_audit_job(job_id: str, code_files: List[CodeFile]) -> None:
         )
 
 
-def _run_github_audit_job(job_id: str, github_url: str) -> None:
+def _run_github_audit_job(job_id: str, github_url: str, depth: str = "full") -> None:
     """Background task that clones a GitHub repo, then hands off to
     _run_audit_job for the actual analysis.
 
@@ -319,7 +326,7 @@ def _run_github_audit_job(job_id: str, github_url: str) -> None:
         "message": f"Cloned repository — {len(code_files)} auditable file(s) found",
         "level": "success",
     })
-    _run_audit_job(job_id, code_files)
+    _run_audit_job(job_id, code_files, depth)
 
 
 # ---------------------------------------------------------------------------
@@ -488,7 +495,7 @@ def audit_stream_start(request: AuditRequest, background_tasks: BackgroundTasks)
         # request appearing to hang.
         input_identifier = request.github_url.split("github.com/")[-1]
         job_id = create_job(input_identifier, input_type="github")
-        background_tasks.add_task(_run_github_audit_job, job_id, request.github_url)
+        background_tasks.add_task(_run_github_audit_job, job_id, request.github_url, request.depth)
         return {"job_id": job_id}
 
     # Paste input is already in-memory and instant to resolve.
@@ -497,7 +504,7 @@ def audit_stream_start(request: AuditRequest, background_tasks: BackgroundTasks)
 
     job_id = create_job("Pasted Code", input_type="paste")
     code_files = _cap_file_count(code_files, job_id=job_id)
-    background_tasks.add_task(_run_audit_job, job_id, code_files)
+    background_tasks.add_task(_run_audit_job, job_id, code_files, request.depth)
 
     return {"job_id": job_id}
 
@@ -506,6 +513,7 @@ def audit_stream_start(request: AuditRequest, background_tasks: BackgroundTasks)
 async def audit_stream_upload_start(
     background_tasks: BackgroundTasks,
     files: List[UploadFile] = File(...),
+    depth: str = Form("full"),
 ) -> dict:
     """Start a file-upload audit in the background and return a job_id.
 
@@ -521,7 +529,7 @@ async def audit_stream_upload_start(
     )
     job_id = create_job(input_identifier, input_type="upload")
     code_files = _cap_file_count(code_files, job_id=job_id)
-    background_tasks.add_task(_run_audit_job, job_id, code_files)
+    background_tasks.add_task(_run_audit_job, job_id, code_files, depth if depth in ("quick", "full") else "full")
 
     return {"job_id": job_id}
 
@@ -609,11 +617,41 @@ def get_trends() -> list:
 class SettingsUpdate(BaseModel):
     model: str
 
+def _model_installed(requested: str, installed: list[str]) -> bool:
+    # Ollama lists "llama3.2:latest" for a model pulled as "llama3.2".
+    return requested in installed or f"{requested}:latest" in installed
+
+
+@app.get("/settings/models")
+def list_models() -> dict:
+    """Models actually installed in the local Ollama, plus the active one."""
+    from src.config import Config
+    from src.llm import installed_models
+    try:
+        models = installed_models()
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Could not list Ollama models: {e}")
+    return {"models": models, "current": Config.MODEL_NAME}
+
+
 @app.post("/settings")
 def update_settings(settings: SettingsUpdate) -> dict:
-    """Updates global backend settings (like model name)."""
+    """Switch the active model. Rejects models that aren't installed, so a
+    typo or un-pulled model fails here instead of failing every audit."""
     from src.config import Config
-    Config.MODEL_NAME = settings.model
+    from src.llm import installed_models, warm_up_model
+    try:
+        installed = installed_models()
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Ollama is not reachable: {e}")
+    if not _model_installed(settings.model, installed):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Model '{settings.model}' is not installed. Run: ollama pull {settings.model}",
+        )
+    if Config.MODEL_NAME != settings.model:
+        Config.MODEL_NAME = settings.model
+        warm_up_model()
     return {"status": "ok", "model": Config.MODEL_NAME}
 
 @app.get("/settings/ollama")

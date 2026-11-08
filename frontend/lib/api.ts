@@ -130,6 +130,30 @@ async function apiFetch<T>(endpoint: string, options?: RequestInit): Promise<T> 
  * @param input - Audit input from the frontend form.
  * @returns Object containing the background job_id.
  */
+/**
+ * Pushes the model chosen on the Settings page to the backend. The backend
+ * keeps it in memory only, so after a restart it would silently fall back to
+ * the default while the UI still shows the saved choice. Best-effort: a
+ * failure must never block starting an audit.
+ */
+async function syncSelectedModel(): Promise<void> {
+    try {
+        const model = window.localStorage.getItem("model");
+        if (!model) return;
+        await fetch(`${getApiBase()}/settings`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ model }),
+        });
+    } catch {
+        // ignore
+    }
+}
+
+export async function fetchInstalledModels(): Promise<{ models: string[]; current: string }> {
+    return apiFetch<{ models: string[]; current: string }>("/settings/models");
+}
+
 export async function startAuditJob(input: AuditInput): Promise<{ job_id: string }> {
     const body: Record<string, string> = {
         input_type: input.mode,
@@ -141,7 +165,9 @@ export async function startAuditJob(input: AuditInput): Promise<{ job_id: string
         body.code = input.code;
         if (input.language) body.language = input.language;
     }
+    body.depth = input.depth ?? "full";
 
+    await syncSelectedModel();
     return apiFetch<{ job_id: string }>("/audit/stream", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -153,11 +179,16 @@ export async function startAuditJob(input: AuditInput): Promise<{ job_id: string
  * Starts a file-upload audit in the background (with the same live SSE
  * progress as GitHub/paste) and returns a job_id.
  */
-export async function startUploadJob(files: File[]): Promise<{ job_id: string }> {
+export async function startUploadJob(
+    files: File[],
+    depth: "quick" | "full" = "full",
+): Promise<{ job_id: string }> {
     const formData = new FormData();
+    formData.append("depth", depth);
     for (const file of files) {
         formData.append("files", file);
     }
+    await syncSelectedModel();
     return apiFetch<{ job_id: string }>("/audit/stream/upload", {
         method: "POST",
         body: formData,

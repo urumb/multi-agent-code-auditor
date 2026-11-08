@@ -11,52 +11,84 @@ class ManagerAgent:
     # timeout. Capping keeps worst-case latency bounded and predictable;
     # the largest snippets (the most substantial functions/classes) are
     # kept since they're the most likely to contain real issues.
-    MAX_SNIPPETS = 8
+    MAX_SNIPPETS = 6
+
+    # Target size of one LLM chunk. ~3000 chars is ~800 tokens: comfortably
+    # inside the 4096-token context together with the prompt and the capped
+    # response, and big enough that small files / small functions are
+    # analyzed together in ONE call per agent instead of one call each.
+    CHUNK_CHARS = 3000
 
     def __init__(self):
         pass
 
+    @staticmethod
+    def _pack(pieces: List[str], limit: int) -> List[str]:
+        """Greedily merge consecutive pieces into chunks of at most ``limit`` chars.
+
+        A piece larger than ``limit`` is split on line boundaries so no single
+        LLM call receives more than the model's context can hold.
+        """
+        chunks: List[str] = []
+        current = ""
+        for piece in pieces:
+            while len(piece) > limit:
+                cut = piece.rfind("\n", 0, limit)
+                cut = cut if cut > 0 else limit
+                if current:
+                    chunks.append(current)
+                    current = ""
+                chunks.append(piece[:cut])
+                piece = piece[cut:].lstrip("\n")
+            if current and len(current) + len(piece) + 2 > limit:
+                chunks.append(current)
+                current = piece
+            else:
+                current = f"{current}\n\n{piece}" if current else piece
+        if current.strip():
+            chunks.append(current)
+        return chunks
+
     def split_code(self, code: str) -> List[str]:
         """
-        Splits Python code into functions and classes using AST.
-        Falls back to simple chunking if AST fails (non-python).
-        Doesn't split very small snippets to save time.
+        Splits code into LLM-sized chunks.
+
+        Small inputs stay whole (one call per agent). Python is split along
+        function/class boundaries; other languages (or unparsable Python) are
+        split on line boundaries. Neighbouring small pieces are packed
+        together to minimize the number of sequential LLM calls.
         """
-        if len(code) < 500:
+        if len(code) <= self.CHUNK_CHARS:
             return [code]
 
+        pieces: List[str] = []
         try:
             tree = ast.parse(code)
-            chunks = []
             lines = code.splitlines()
-
             for node in tree.body:
                 if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-                    # Extract the segment
-                    start = node.lineno - 1
-                    end = node.end_lineno
-                    chunk = "\n".join(lines[start:end])
-                    chunks.append(chunk)
-                else:
-                    pass
-
-            # If no functions/classes found, treat whole file as one chunk
-            if not chunks:
-                return [code]
-
-            if len(chunks) > self.MAX_SNIPPETS:
-                chunks = sorted(chunks, key=len, reverse=True)[: self.MAX_SNIPPETS]
-
-            return chunks
-
+                    pieces.append("\n".join(lines[node.lineno - 1 : node.end_lineno]))
         except SyntaxError:
-            # Not valid python or other language
-            return [code]
+            pass
 
-    def build_execution_plan(self, code: str, repository_file_count: int = 1) -> Dict[str, object]:
+        if not pieces:
+            pieces = [code]
+
+        chunks = self._pack(pieces, self.CHUNK_CHARS)
+        if len(chunks) > self.MAX_SNIPPETS:
+            chunks = sorted(chunks, key=len, reverse=True)[: self.MAX_SNIPPETS]
+        return chunks
+
+    def build_execution_plan(self, code: str, repository_file_count: int = 1, depth: str = "full") -> Dict[str, object]:
         """
         Chooses the minimum useful agent set for the submitted input.
         """
+        if depth == "quick":
+            return {
+                "agents": ["security"],
+                "reason": "Quick scan (security only)",
+            }
+
         if len(code) < 200:
             return {
                 "agents": ["security"],
@@ -82,7 +114,7 @@ class ManagerAgent:
         original_code = state.get("original_code", "")
         repository_file_count = state.get("repository_file_count") or 1
         snippets = self.split_code(original_code)
-        execution_plan = self.build_execution_plan(original_code, repository_file_count)
+        execution_plan = self.build_execution_plan(original_code, repository_file_count, state.get("depth") or "full")
         
         # Update state
         return {

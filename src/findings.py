@@ -31,13 +31,33 @@ class Finding(BaseModel):
     agent: str = Field(default="", exclude=False)
 
 
+def _loads(text: str) -> Any:
+    """json.loads that keeps BOTH values when a model repeats a key.
+
+    Small local models sometimes emit {"findings": [a], "findings": [b]};
+    plain json.loads silently keeps only the last one, dropping real findings.
+    Repeated list values are concatenated instead.
+    """
+
+    def merge_pairs(pairs):
+        merged: Dict[str, Any] = {}
+        for key, value in pairs:
+            if key in merged and isinstance(merged[key], list) and isinstance(value, list):
+                merged[key] = merged[key] + value
+            else:
+                merged[key] = value
+        return merged
+
+    return json.loads(text, object_pairs_hook=merge_pairs)
+
+
 def _candidate_json_slice(text: str) -> Any:
     """Try to parse text as JSON, trimming to the outermost {..} or [..] if needed."""
     text = text.strip()
     if not text:
         return None
     try:
-        return json.loads(text)
+        return _loads(text)
     except json.JSONDecodeError:
         pass
     for open_ch, close_ch in (("{", "}"), ("[", "]")):
@@ -45,7 +65,7 @@ def _candidate_json_slice(text: str) -> Any:
         end = text.rfind(close_ch)
         if start != -1 and end != -1 and end > start:
             try:
-                return json.loads(text[start : end + 1])
+                return _loads(text[start : end + 1])
             except json.JSONDecodeError:
                 continue
     return None

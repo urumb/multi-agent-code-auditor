@@ -97,6 +97,8 @@ export interface AuditInput {
     files?: File[];
     code?: string;
     language?: ProgrammingLanguage;
+    /** quick = Security agent only; full = all agents. */
+    depth?: "quick" | "full";
 }
 
 /** Represents an agent node in the agent graph. */

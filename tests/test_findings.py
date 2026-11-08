@@ -103,3 +103,13 @@ class RiskScoreTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_duplicate_findings_keys_are_merged_not_dropped():
+    from src.findings import normalize_findings
+
+    raw = (
+        '{"findings":[{"severity":"High","issue":"A","explanation":"x","suggested_fix":"y"}],'
+        '"findings":[{"severity":"Low","issue":"B","explanation":"x","suggested_fix":"y"}]}'
+    )
+    assert [f["issue"] for f in normalize_findings(raw, "security")] == ["A", "B"]

@@ -17,6 +17,7 @@ def run_audit_on_code(
     log_callback: LogCallback = None,
     event_callback: EventCallback = None,
     repository_file_count: int = 1,
+    depth: str = "full",
 ) -> Dict[str, Any]:
     """Run the full LangGraph audit pipeline on a single code string.
 
@@ -48,6 +49,7 @@ def run_audit_on_code(
     initial_state = {
         "original_code": code,
         "repository_file_count": repository_file_count,
+        "depth": depth,
         "code_snippets": [],
         "execution_plan": {},
         "event_callback": event_callback,

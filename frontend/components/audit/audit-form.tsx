@@ -23,6 +23,7 @@ interface AuditFormProps {
         files?: File[];
         code?: string;
         language?: ProgrammingLanguage;
+        depth?: "quick" | "full";
     }) => void;
     /** Whether an audit is currently running. */
     isRunning: boolean;
@@ -55,6 +56,14 @@ export function AuditForm({ onSubmit, isRunning }: AuditFormProps) {
     const [code, setCode] = useState("");
     const [language, setLanguage] = useState<ProgrammingLanguage>("python");
     const [dragging, setDragging] = useState(false);
+    const [depth, setDepth] = useState<"quick" | "full">("full");
+
+    const selectMode = (mode: AuditInputMode) => {
+        setInputMode(mode);
+        // Repos contain many files and each file costs a full model pass, so
+        // default them to the fast scan (still switchable).
+        if (mode === "github") setDepth("quick");
+    };
 
     const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
         e.preventDefault();
@@ -64,7 +73,7 @@ export function AuditForm({ onSubmit, isRunning }: AuditFormProps) {
     };
 
     const handleSubmit = () => {
-        onSubmit({ mode: inputMode, githubUrl, files, code, language });
+        onSubmit({ mode: inputMode, githubUrl, files, code, language, depth });
     };
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -91,7 +100,7 @@ export function AuditForm({ onSubmit, isRunning }: AuditFormProps) {
                     <button
                         key={tab.mode}
                         type="button"
-                        onClick={() => setInputMode(tab.mode)}
+                        onClick={() => selectMode(tab.mode)}
                         className={cn(
                             "flex items-center gap-2 rounded-full px-4 py-2 text-[0.8125rem] font-medium transition-all duration-300",
                             inputMode === tab.mode
@@ -206,13 +215,42 @@ export function AuditForm({ onSubmit, isRunning }: AuditFormProps) {
                 </div>
             )}
 
+            {/* Scan depth */}
+            <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                    <p className="eyebrow">Scan depth</p>
+                    <p className="mt-1.5 max-w-sm text-xs text-muted-foreground">
+                        {depth === "quick"
+                            ? "Security agent only. Fastest, about 20s per file on a CPU."
+                            : "Security, performance and quality agents plus the reviewer. About 1-2 min per file on a CPU."}
+                    </p>
+                </div>
+                <div className="inline-flex gap-1 rounded-full border border-border bg-background/60 p-1">
+                    {(["quick", "full"] as const).map((d) => (
+                        <button
+                            key={d}
+                            type="button"
+                            onClick={() => setDepth(d)}
+                            className={cn(
+                                "rounded-full px-4 py-1.5 text-[0.8125rem] font-medium capitalize transition-all duration-300",
+                                depth === d
+                                    ? "bg-secondary text-foreground shadow-sm shadow-black/40"
+                                    : "text-muted-foreground hover:text-foreground"
+                            )}
+                        >
+                            {d}
+                        </button>
+                    ))}
+                </div>
+            </div>
+
             {/* Submit button */}
             <button
                 type="button"
                 onClick={handleSubmit}
                 disabled={!isValid || isRunning}
                 className={cn(
-                    "mt-8 flex w-full items-center justify-center gap-2 rounded-full px-6 py-3.5 text-sm font-semibold transition-all duration-300",
+                    "mt-6 flex w-full items-center justify-center gap-2 rounded-full px-6 py-3.5 text-sm font-semibold transition-all duration-300",
                     isValid && !isRunning
                         ? "bg-foreground text-background hover:-translate-y-px hover:shadow-[0_10px_30px_-12px_rgba(59,239,140,0.5)] active:scale-[0.99]"
                         : "cursor-not-allowed bg-secondary text-muted-foreground"

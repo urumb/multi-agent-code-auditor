@@ -138,7 +138,7 @@ def finalize_node(state: AuditorState):
 
     return {
         "final_report": json.dumps({
-            "Executive Summary": "Fast security scan for a small code snippet — only the Security Agent ran.",
+            "Executive Summary": "Quick security scan - only the Security Agent ran. Run a Full scan for performance and quality analysis too.",
             "Findings Summary": summary,
             "risk_score": risk_info["risk_score"],
             "risk_breakdown": risk_info["risk_breakdown"],

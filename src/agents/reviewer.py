@@ -1,5 +1,6 @@
 # Author: urumb
 from langchain_ollama import ChatOllama
+from ..llm import make_llm, invoke_llm, REVIEWER_MAX_TOKENS
 from langchain_core.prompts import ChatPromptTemplate
 from ..config import Config
 from ..state import AuditorState
@@ -38,12 +39,37 @@ class ReviewerAgent:
     def _get_llm(self) -> ChatOllama:
         model = Config.MODEL_NAME
         if model not in self._llm_cache:
-            self._llm_cache[model] = ChatOllama(
-                base_url=Config.OLLAMA_BASE_URL,
-                model=model,
-                temperature=0,
-            )
+            self._llm_cache[model] = make_llm(0, max_tokens=REVIEWER_MAX_TOKENS)
         return self._llm_cache[model]
+
+    @staticmethod
+    def _build_summary(findings: list, risk_info: dict, code_len: int) -> dict:
+        """Deterministic executive summary derived from the merged findings."""
+        counts: dict[str, int] = {}
+        for f in findings:
+            counts[f.get("severity", "Low")] = counts.get(f.get("severity", "Low"), 0) + 1
+        order = ["Critical", "High", "Medium", "Low"]
+        breakdown = ", ".join(f"{counts[k]} {k}" for k in order if counts.get(k))
+        agents = sorted({str(f.get("agent", "")).title() for f in findings if f.get("agent")})
+        if findings:
+            top = min(findings, key=lambda f: order.index(f.get("severity", "Low")) if f.get("severity", "Low") in order else 9)
+            executive = (
+                f"Reviewed {code_len:,} characters of code and merged {len(findings)} finding(s) "
+                f"({breakdown}). Highest risk: {top.get('issue', 'n/a')} ({top.get('severity', 'Low')})."
+            )
+            summary = f"Findings reported by: {', '.join(agents) or 'n/a'}."
+        else:
+            executive = f"Reviewed {code_len:,} characters of code and found no issues."
+            summary = "No findings were reported by any agent."
+        return {
+            "Executive Summary": executive,
+            "Findings Summary": summary,
+            "risk_score": risk_info["risk_score"],
+            "risk_breakdown": risk_info["risk_breakdown"],
+            "max_severity": risk_info["max_severity"],
+            "findings": findings,
+            "top_risk_files": [],
+        }
 
     def run(self, state: AuditorState) -> AuditorState:
         print("--- Reviewer Agent: Synthesizing Report ---")
@@ -57,10 +83,23 @@ class ReviewerAgent:
         original_code = state.get("original_code", "")
         
         # Format the inputs for the specific Prompt
-        sec_text = "\n".join([f"Snippet {x['snippet_index']}: {x.get('analysis', 'Error: ' + str(x.get('error', 'Unknown')))}" for x in security_data])
-        perf_text = "\n".join([f"Snippet {x['snippet_index']}: {x.get('analysis', 'Error: ' + str(x.get('error', 'Unknown')))}" for x in performance_data])
-        qual_text = "\n".join([f"Snippet {x['snippet_index']}: {x.get('analysis', 'Error: ' + str(x.get('error', 'Unknown')))}" for x in quality_data])
-        past_text = "\n".join(past_audits) if past_audits else "No similar past audits found."
+        def _compact(items: list) -> str:
+            # One short line per finding instead of the agents' full raw
+            # output: far fewer prompt tokens to process on a CPU, and the
+            # reviewer only needs to write a two-sentence summary.
+            lines = []
+            for x in items:
+                if x.get("error"):
+                    lines.append(f"(analysis error: {str(x['error'])[:80]})")
+                    continue
+                for f in x.get("findings", []):
+                    lines.append(f"- [{f.get('severity', 'Low')}] {str(f.get('issue', ''))[:100]}")
+            return "\n".join(lines) if lines else "No issues reported."
+
+        sec_text = _compact(security_data)
+        perf_text = _compact(performance_data)
+        qual_text = _compact(quality_data)
+        past_text = "\n".join(past_audits)[:400] if past_audits else "No similar past audits found."
 
         # Computed up front (doesn't depend on the LLM call) so a synthesis
         # failure below never discards the real findings the other three
@@ -68,10 +107,13 @@ class ReviewerAgent:
         all_findings = collect_findings(security_data, performance_data, quality_data)
         risk_info = compute_risk_score(all_findings)
 
+        if not Config.REVIEWER_USE_LLM:
+            return {"final_report": json.dumps(self._build_summary(all_findings, risk_info, len(original_code)))}
+
         chain = self.prompt | self._get_llm()
 
         try:
-            response = chain.invoke({
+            response = invoke_llm(chain, {
                 "code_len": len(original_code),
                 "security_reports": sec_text,
                 "performance_reports": perf_text,

@@ -1,5 +1,6 @@
 # Author: urumb
 from langchain_ollama import ChatOllama
+from ..llm import make_llm, invoke_llm, ANALYSIS_MAX_TOKENS
 from langchain_core.prompts import ChatPromptTemplate
 from ..config import Config
 from ..findings import normalize_findings
@@ -26,6 +27,8 @@ Return only valid JSON with this exact shape:
   ]
 }}
 
+Report at most 2 findings, most severe first. Keep issue under 8 words, explanation and suggested_fix under 25 words each, before_code and after_code to 1-2 lines each, and set cwe to "" if unsure.
+
 If there are no findings, return {{"findings": []}}."""),
             ("user", "Code Snippet:\n{code}")
         ])
@@ -33,11 +36,7 @@ If there are no findings, return {{"findings": []}}."""),
     def _get_llm(self) -> ChatOllama:
         model = Config.MODEL_NAME
         if model not in self._llm_cache:
-            self._llm_cache[model] = ChatOllama(
-                base_url=Config.OLLAMA_BASE_URL,
-                model=model,
-                temperature=0.2,
-            )
+            self._llm_cache[model] = make_llm(0.2, max_tokens=ANALYSIS_MAX_TOKENS)
         return self._llm_cache[model]
 
     def run(self, state: AuditorState) -> AuditorState:
@@ -49,7 +48,7 @@ If there are no findings, return {{"findings": []}}."""),
 
         for i, snippet in enumerate(snippets):
             try:
-                response = chain.invoke({"code": snippet})
+                response = invoke_llm(chain, {"code": snippet})
                 results.append({
                     "snippet_index": i,
                     "analysis": response.content,

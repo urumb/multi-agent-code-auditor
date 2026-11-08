@@ -21,7 +21,8 @@ def _zip(entries: dict[str, str]) -> bytes:
 
 
 def test_zip_extracts_only_auditable_files():
-    data = _zip({"p/a.py": "x=1", "p/readme.txt": "hi", "node_modules/b.py": "y=2"})
+    body = "def add(a, b):\n    return a + b\n" * 3
+    data = _zip({"p/a.py": body, "p/empty.py": "", "p/readme.txt": "hi", "node_modules/b.py": body})
     files = asyncio.run(ip.process_uploaded_files([_upload("p.zip", data)]))
     assert [f.path for f in files] == ["p/a.py"]
 

@@ -319,7 +319,7 @@ export function useAudit(): UseAuditReturn {
             try {
                 const { job_id } =
                     input.mode === "upload"
-                        ? await startUploadJob(input.files ?? [])
+                        ? await startUploadJob(input.files ?? [], input.depth ?? "full")
                         : await startAuditJob(input);
                 localStorage.setItem(JOB_STORAGE_KEY, job_id);
                 await _handleSubscription(job_id);

@@ -65,6 +65,7 @@
 }
 
 html {
+  color-scheme: dark; /* native dropdowns/scrollbars follow the dark theme */
   scroll-behavior: smooth;
   background: var(--background);
 }

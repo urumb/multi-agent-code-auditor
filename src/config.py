@@ -25,6 +25,11 @@ class Config:
         if origin.strip()
     ]
 
+    # The Reviewer's executive summary is built from the findings directly
+    # (instant). Set REVIEWER_USE_LLM=true to have the LLM write it instead -
+    # costs one extra model call per file (slow on CPU-only machines).
+    REVIEWER_USE_LLM = os.getenv("REVIEWER_USE_LLM", "false").lower() == "true"
+
     # Model to use explicitly. Mutable at runtime via POST /settings; agents
     # read this attribute on every run rather than capturing it once.
     MODEL_NAME = os.getenv("MODEL_NAME", "llama3.2")

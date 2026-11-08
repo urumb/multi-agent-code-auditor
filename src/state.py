@@ -10,6 +10,7 @@ class AuditorState(TypedDict):
     """
     original_code: str
     repository_file_count: Optional[int]
+    depth: Optional[str]  # "quick" (security only) or "full" (all agents)
     code_snippets: List[str]  # Decomposed functions/blocks
     execution_plan: ExecutionPlan
     event_callback: Optional[EventCallback]

@@ -32,6 +32,7 @@ IGNORED_DIRS: set[str] = {
 # able to exhaust disk/memory/CPU on the auditing host.
 MAX_REPO_SIZE_KB = 300_000  # ~300MB, checked via the GitHub API before cloning
 MAX_FILE_BYTES = 512_000  # skip individual files over ~500KB (generated/minified/binary)
+MIN_USEFUL_CHARS = 50  # skip near-empty files in repos/zips (e.g. empty __init__.py)
 MAX_FILES_SCANNED = 500  # stop walking after this many matching files, even before the
                           # audit-stage MAX_FILES_PER_AUDIT cap gets a chance to apply
 
@@ -114,6 +115,8 @@ def process_github_repo(url: str) -> List[CodeFile]:
                         continue
                     with open(abs_path, "r", encoding="utf-8", errors="ignore") as f:
                         content = f.read()
+                    if len(content.strip()) < MIN_USEFUL_CHARS:
+                        continue  # empty __init__.py etc.: nothing to audit, but costs a full LLM pass
                     code_files.append(CodeFile(path=rel_path, content=content))
                 except OSError as read_err:
                     logger.warning("Skipping unreadable file %s: %s", rel_path, read_err)
@@ -234,6 +237,8 @@ def _extract_zip(raw_bytes: bytes, zip_name: str) -> List[CodeFile]:
                 break
             with archive.open(info) as fh:
                 content = fh.read(MAX_FILE_BYTES + 1).decode("utf-8", errors="ignore")
+            if len(content.strip()) < MIN_USEFUL_CHARS:
+                continue
             extracted.append(CodeFile(path="/".join(parts), content=content))
     return extracted
 

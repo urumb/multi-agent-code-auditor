@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { fetchInstalledModels } from "@/lib/api";
 import { Save, Server, Palette, RotateCcw, Brain } from "lucide-react";
 import { toast } from "sonner";
 
@@ -13,6 +14,7 @@ export default function SettingsPage() {
     const [apiUrl, setApiUrl] = useState("http://localhost:8000");
     const [model, setModel] = useState("llama3.2");
     const [autoRetry, setAutoRetry] = useState(true);
+    const [installedModels, setInstalledModels] = useState<string[]>([]);
     const [ollamaStatus, setOllamaStatus] = useState<"checking" | "ok" | "error">("checking");
 
     const checkOllamaConnection = async () => {
@@ -53,6 +55,16 @@ export default function SettingsPage() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
+    useEffect(() => {
+        // Only offer models that are really installed in Ollama.
+        fetchInstalledModels()
+            .then(({ models, current }) => {
+                setInstalledModels(models);
+                if (!localStorage.getItem("model")) setModel(current);
+            })
+            .catch(() => setInstalledModels([]));
+    }, []);
+
     const handleSave = async () => {
         localStorage.setItem("apiUrl", apiUrl);
         localStorage.setItem("model", model);
@@ -60,12 +72,17 @@ export default function SettingsPage() {
 
         try {
             // Post settings to backend
-            await fetch(`${apiUrl}/settings`, {
+            const res = await fetch(`${apiUrl}/settings`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ model })
             });
-            toast.success("Settings saved");
+            if (!res.ok) {
+                const body = await res.json().catch(() => null);
+                toast.error(body?.detail ?? "Backend rejected the model.");
+                return;
+            }
+            toast.success(`Settings saved - using ${model}`);
             checkOllamaConnection();
         } catch {
             toast.error("Settings saved locally, but failed to sync with backend.");
@@ -145,12 +162,17 @@ export default function SettingsPage() {
                         onChange={(e) => setModel(e.target.value)}
                         className="w-full rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50 transition-all cursor-pointer"
                     >
-                        <option value="deepseek-r1:8b">DeepSeek R1 (8B)</option>
-                        <option value="llama3.2">Llama 3.2</option>
-                        <option value="llama3:8b">Llama 3 (8B)</option>
-                        <option value="codellama:7b">CodeLlama (7B)</option>
-                        <option value="mistral:7b">Mistral (7B)</option>
+                        {(installedModels.includes(model) ? installedModels : [model, ...installedModels]).map((m) => (
+                            <option key={m} value={m}>
+                                {m}
+                            </option>
+                        ))}
                     </select>
+                    {installedModels.length > 0 && !installedModels.includes(model) && (
+                        <p className="text-xs text-yellow-400">
+                            {model} is not installed. Run <code>ollama pull {model}</code> first.
+                        </p>
+                    )}
                     <p className="text-xs text-muted-foreground mt-2">
                         This project runs AI models locally using Ollama. The AI analysis pipeline will only work when the backend is running on a machine with Ollama installed and a model downloaded.
                     </p>

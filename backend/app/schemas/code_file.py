@@ -30,6 +30,7 @@ class AuditRequest(BaseModel):
     github_url: Optional[str] = None
     code: Optional[str] = None
     language: Optional[str] = None
+    depth: Literal["quick", "full"] = "full"
 
     @model_validator(mode="after")
     def validate_fields_for_input_type(self) -> "AuditRequest":

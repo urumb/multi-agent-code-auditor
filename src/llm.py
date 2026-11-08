@@ -1,0 +1,79 @@
+# Author: urumb
+"""Shared Ollama client factory tuned for fast local (often CPU-only) inference.
+
+Why these settings matter on a CPU:
+- ``num_predict`` caps generated tokens. Generation is the slowest part and
+  runaway/rambling output is the most common cause of timeouts.
+- ``format="json"`` constrains the model to emit valid JSON, which is both
+  shorter and removes parse failures.
+- ``num_ctx`` keeps the KV cache small (faster prompt processing, less RAM).
+- ``keep_alive`` keeps the model resident so only the first audit pays the
+  model-load cost.
+"""
+import os
+import threading
+
+import requests
+from langchain_ollama import ChatOllama
+
+from .config import Config
+
+# Output caps per role (tokens).
+ANALYSIS_MAX_TOKENS = 260
+REVIEWER_MAX_TOKENS = 160
+NUM_CTX = 4096
+KEEP_ALIVE = "30m"
+
+
+# Local inference (especially on CPU) is throughput-bound: running the three
+# analysis agents' calls at the same time just makes each one ~3x slower
+# (cores and memory bandwidth are shared), so total time is no better and
+# every call risks the timeout. Calls therefore take turns by default. Raise
+# LLM_CONCURRENCY only if you have a GPU / OLLAMA_NUM_PARALLEL > 1.
+_LLM_SLOTS = threading.BoundedSemaphore(max(1, int(os.getenv("LLM_CONCURRENCY", "1"))))
+
+
+def invoke_llm(chain, inputs):
+    """Run ``chain.invoke(inputs)`` while holding one of the LLM slots."""
+    with _LLM_SLOTS:
+        return chain.invoke(inputs)
+
+
+def make_llm(temperature: float, *, max_tokens: int, json_mode: bool = True) -> ChatOllama:
+    """Build a ChatOllama client for the currently configured model."""
+    return ChatOllama(
+        base_url=Config.OLLAMA_BASE_URL,
+        model=Config.MODEL_NAME,
+        temperature=temperature,
+        num_predict=max_tokens,
+        num_ctx=NUM_CTX,
+        keep_alive=KEEP_ALIVE,
+        format="json" if json_mode else None,
+    )
+
+
+def installed_models() -> list[str]:
+    """Names of models currently pulled into the local Ollama install."""
+    response = requests.get(f"{Config.OLLAMA_BASE_URL}/api/tags", timeout=5)
+    response.raise_for_status()
+    return sorted(m["name"] for m in response.json().get("models", []))
+
+
+def warm_up_model() -> None:
+    """Load the configured model into memory in the background.
+
+    Fire-and-forget: the first real audit then skips the cold-load delay
+    (often 10-60s on CPU). Failures are ignored; Ollama may simply be down.
+    """
+
+    def _warm() -> None:
+        try:
+            requests.post(
+                f"{Config.OLLAMA_BASE_URL}/api/generate",
+                json={"model": Config.MODEL_NAME, "prompt": "", "keep_alive": KEEP_ALIVE},
+                timeout=120,
+            )
+        except requests.RequestException:
+            pass
+
+    threading.Thread(target=_warm, daemon=True).start()
