@@ -40,7 +40,7 @@ class Config:
 
     # Most findings each analysis agent may report per code chunk. Each extra
     # finding costs ~130 output tokens, i.e. noticeably slower on a CPU.
-    MAX_FINDINGS_PER_CHUNK = max(1, int(os.getenv("MAX_FINDINGS_PER_CHUNK", "3")))
+    MAX_FINDINGS_PER_CHUNK = max(1, int(os.getenv("MAX_FINDINGS_PER_CHUNK", "2")))
 
     # ChromaDB "memory" of past audits. Off by default: it only feeds the
     # optional LLM reviewer summary, yet costs an embedding-model download

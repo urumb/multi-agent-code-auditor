@@ -144,7 +144,9 @@ Before the AI agents run, each file is scanned by real analyzers. They never exe
 |---|---|---|---|
 | bandit | Python | Security | Yes (`requirements.txt`) |
 | ruff | Python | Quality, Performance | Yes (`requirements.txt`) |
-| semgrep | JS / TS (bundled rules in `rules/semgrep.yml`) | Security | Optional: `pip install semgrep` |
+| semgrep | JS / TS (bundled rules in `rules/semgrep.yml`) | Security | Optional, recommended: `pipx install semgrep` |
+
+Install semgrep with `pipx install semgrep` (its own isolated environment), **not** into the project's virtualenv: its dependencies conflict with FastAPI's and ChromaDB's pinned versions. The auditor finds it on your `PATH`. Without it, JS/TS files are covered only by the AI agents, which find far less (see *Benchmark*).
 
 semgrep runs fully offline against the bundled rule file with metrics disabled; nothing is downloaded or uploaded. Point `SEMGREP_RULES` at your own rule file to extend it. Set `STATIC_ANALYSIS_ENABLED=false` to turn the pre-pass off.
 
@@ -159,7 +161,17 @@ python -m benchmarks.run_benchmark --static-only -v   # tools only, no Ollama ne
 python -m benchmarks.run_benchmark -v                 # full pipeline, needs Ollama running
 ```
 
-Run it before and after changing prompts, models or rules to see whether results actually improved. The static-only run is also enforced in CI (`tests/test_batch2_findings.py`), so a change that makes the tools miss known issues or flag clean code fails the build.
+Run it before and after changing prompts, models or rules to see whether results actually improved.
+
+Measured results (27 labeled issues across 8 files, 2 of them clean):
+
+| Configuration | Found | Precision | False alarms on clean files | Time |
+|---|---|---|---|---|
+| Static tools only, with semgrep | 24/27 | 96% | 0 | ~15s |
+| Static tools only, no semgrep | 18/27 | 95% | 0 | ~7s |
+| Tools + AI agents (`llama3.2` 3B, CPU), no semgrep | 18/27 | 58% | 8 | ~15 min |
+
+With a small local model the AI agents add little beyond the tools and introduce false positives; they are most useful for issues no rule covers. A larger model (e.g. `qwen2.5-coder:7b`) is worth benchmarking if you have the hardware. The static-only run is also enforced in CI (`tests/test_batch2_findings.py`), so a change that makes the tools miss known issues or flag clean code fails the build.
 
 ---
 
@@ -179,7 +191,7 @@ Local LLMs are the bottleneck, especially on CPU-only machines (typically ~10 to
 - Small files are analyzed in a single call per agent; larger files are split into ~3000-character chunks (not one call per function).
 - LLM calls take turns instead of competing for the same CPU cores (set `LLM_CONCURRENCY` higher only if you have a GPU).
 - The Reviewer's executive summary is generated instantly from the merged findings. Set `REVIEWER_USE_LLM=true` to have the model write it instead (one extra call per file).
-- Each agent reports up to `MAX_FINDINGS_PER_CHUNK` findings per chunk (default 3). Lower it for speed, raise it for thoroughness; each extra finding costs ~130 output tokens.
+- Each agent reports up to `MAX_FINDINGS_PER_CHUNK` findings per chunk (default 2). Lower it for speed, raise it for thoroughness; each extra finding costs ~130 output tokens.
 - Repository audits skip near-empty files and are capped at `MAX_FILES_PER_AUDIT` files per run (default 25).
 
 Rough timings on a laptop CPU with `llama3.2`: Quick ~20-35s per file, Full ~1-2 min per file. For faster audits, use *Quick*, or pull a smaller model (`ollama pull llama3.2:1b`) and select it in Settings. Settings only lists models that are actually installed in Ollama.

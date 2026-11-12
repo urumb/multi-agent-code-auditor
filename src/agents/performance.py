@@ -9,7 +9,8 @@ class PerformanceAgent(AnalysisAgent):
     role = (
         "You are a Senior Performance Engineer. Analyze the code for inefficient algorithms, "
         "unnecessary repeated work, avoidable I/O, memory pressure, blocking operations, and "
-        "scalability risks."
+        "scalability risks. Do not report security vulnerabilities, error handling or style: "
+        "other agents cover those."
     )
     explanation_hint = "why this affects runtime, memory, or scalability"
     after_hint = "optimized replacement code"

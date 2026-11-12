@@ -50,9 +50,40 @@ def test_llm_and_tool_reporting_same_line_merge_into_one():
     assert sql[0]["severity"] == "High"  # highest severity wins
 
 
-def test_unlocatable_duplicates_merge_by_title():
-    merged = merge_findings([_llm("Weak hashing", "nowhere"), _llm("weak  hashing", "nowhere either")], [], SQL_CODE)
+def test_unlocatable_duplicates_merge_by_title_when_source_unknown():
+    merged = merge_findings([_llm("Weak hashing", "nowhere"), _llm("weak  hashing", "nowhere either")], [], "")
     assert len(merged) == 1
+
+
+def test_llm_finding_quoting_code_not_in_file_is_dropped():
+    merged = merge_findings([_llm("Hardcoded secret", "API_KEY = 'abc123456'")], [], SQL_CODE)
+    assert merged == []
+
+
+def test_other_agents_cannot_refile_a_line_security_owns():
+    line_code = "query = \"SELECT * FROM users WHERE name = '%s'\" % name"
+    merged = merge_findings(
+        [
+            _llm("SQL injection", line_code, agent="security"),
+            _llm("Unparameterized query is slow", line_code, agent="performance"),
+            _llm("Unvalidated input", line_code, agent="quality"),
+        ],
+        [],
+        SQL_CODE,
+    )
+    assert [f["agent"] for f in merged] == ["security"]
+
+
+def test_tool_owned_line_blocks_llm_refiling_but_keeps_same_agent_merge():
+    static = [{"agent": "quality", "line": 4, "source": "ruff", "rule_id": "F841", "severity": "Low",
+               "issue": "unused", "before_code": ""}]
+    line_code = "query = \"SELECT * FROM users WHERE name = '%s'\" % name"
+    merged = merge_findings(
+        [_llm("Bad name", line_code, agent="quality"), _llm("Slow", line_code, agent="performance")],
+        static,
+        SQL_CODE,
+    )
+    assert len(merged) == 1 and merged[0]["source"] == "llm+ruff"
 
 
 def test_different_tool_rules_on_one_line_stay_separate():

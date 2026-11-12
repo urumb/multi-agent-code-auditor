@@ -40,6 +40,8 @@ Return only valid JSON with this exact shape:
   ]
 }}}}
 
+Only report problems you are confident are real in THIS code and that belong to your specialty. Most code has few or no such problems: returning an empty list is the correct answer when you find none, so never pad the list.
+
 Report at most {{max_findings}} findings, most severe first. Keep issue under 8 words, explanation and suggested_fix under 25 words each, before_code and after_code to 1-2 lines each. Copy before_code exactly from the snippet so it can be located.
 
 Static analysis tools already reported the issues listed by the user. Do NOT repeat them; look for other problems they missed.

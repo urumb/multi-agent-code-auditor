@@ -14,7 +14,8 @@ chromadb==1.5.0
 python-dotenv==1.1.0
 
 # Static analyzers run before the LLM agents (src/static_analysis.py).
-# Optional extra: `pip install semgrep` to also scan JS/TS with rules/semgrep.yml.
+# Optional: `pipx install semgrep` (NOT into this venv: its deps conflict with
+# FastAPI/ChromaDB pins) to also scan JS/TS with rules/semgrep.yml.
 bandit==1.9.4
 ruff==0.17.4
 # Install Ollama separately from https://ollama.com

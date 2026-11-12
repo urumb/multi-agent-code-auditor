@@ -139,7 +139,10 @@ def normalize_findings(raw: Any, agent: str, snippet: str = "") -> List[Dict[str
                     issue=f"Unstructured {agent.title()} finding",
                     explanation=raw.strip(),
                     suggested_fix="Review the agent output and convert it into a concrete code change.",
-                    before_code=snippet,
+                    # No quoted code: it can't be located, so merge_findings
+                    # drops it whenever the file's source is known (the
+                    # benchmark showed these are noise pinned to line 1).
+                    before_code="",
                     after_code="",
                     cwe="",
                     agent=agent,
@@ -276,6 +279,28 @@ def _is_duplicate(a: Dict[str, Any], b: Dict[str, Any]) -> bool:
     return False
 
 
+# When several agents flag the same line, the first in this order keeps it.
+_AGENT_PRIORITY = {"security": 0, "quality": 1, "performance": 2}
+
+
+def _one_owner_per_line(findings: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Drop LLM-only findings on a line another agent or a tool already owns."""
+    ranked = sorted(
+        findings,
+        key=lambda f: (f.get("source") == "llm", _AGENT_PRIORITY.get(str(f.get("agent")), 3)),
+    )
+    owners: Dict[int, str] = {}
+    kept = []
+    for f in ranked:
+        line = f.get("line")
+        if line is not None and f.get("source") == "llm" and owners.get(line, f.get("agent")) != f.get("agent"):
+            continue
+        if line is not None:
+            owners.setdefault(line, f.get("agent"))
+        kept.append(f)
+    return kept
+
+
 def merge_findings(
     llm_findings: List[Dict[str, Any]],
     static_findings: Optional[List[Dict[str, Any]]] = None,
@@ -284,8 +309,13 @@ def merge_findings(
     """Combine LLM and static-analysis findings into one de-duplicated list.
 
     - LLM findings get a verified line number when their quoted code is found.
+      When the source is known and the quoted code is NOT in it, the finding
+      is dropped: on the benchmark none of these were real issues.
     - The same problem reported twice (same agent and line, e.g. bandit and
       the Security Agent both flagging one SQL query) becomes one finding.
+    - An LLM finding on a line already reported by a tool or a higher-priority
+      agent is dropped. Small models re-file one issue under every agent
+      (e.g. an eval() call as a "performance" issue).
     - Output is sorted most severe first, then by line.
     """
     code_lines = original_code.splitlines()
@@ -297,6 +327,8 @@ def merge_findings(
         copied.setdefault("source", "llm")
         if copied.get("line") is None and code_lines:
             copied["line"] = locate_line(copied.get("before_code", ""), code_lines)
+            if copied["line"] is None:
+                continue  # quoted code isn't in the file: unverifiable
         combined.append(copied)
 
     merged: List[Dict[str, Any]] = []
@@ -307,6 +339,8 @@ def merge_findings(
                 break
         else:
             merged.append(finding)
+
+    merged = _one_owner_per_line(merged)
 
     def sort_key(f: Dict[str, Any]):
         sev = _normalize_severity(f.get("severity"))
