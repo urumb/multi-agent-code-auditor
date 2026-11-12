@@ -5,8 +5,6 @@ import unittest
 
 from src.config import Config
 
-os.makedirs(r"C:\tmp", exist_ok=True)
-
 from backend.app.services import db  # noqa: E402
 
 
@@ -14,7 +12,7 @@ class AuditHistoryDbTests(unittest.TestCase):
     def setUp(self):
         # Fresh, isolated DB file per test — never touches the real
         # audit_history.db and tests never see each other's rows.
-        self._tmp_dir = tempfile.mkdtemp(prefix="auditor_test_db_", dir=r"C:\tmp")
+        self._tmp_dir = tempfile.mkdtemp(prefix="auditor_test_db_")
         Config.AUDIT_DB_PATH = os.path.join(self._tmp_dir, "test_audit_history.db")
         db._initialized = False
 

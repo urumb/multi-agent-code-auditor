@@ -63,6 +63,12 @@ def init_db() -> None:
             )
             """
         )
+        # Columns added after the first release; add them to older databases.
+        existing = {row["name"] for row in conn.execute("PRAGMA table_info(audit_jobs)")}
+        if "files_skipped" not in existing:
+            conn.execute(
+                "ALTER TABLE audit_jobs ADD COLUMN files_skipped INTEGER NOT NULL DEFAULT 0"
+            )
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_audit_jobs_created_at ON audit_jobs(created_at DESC)"
         )
@@ -89,6 +95,7 @@ def upsert_job(
     max_severity: str = "Low",
     error: Optional[str] = None,
     results: Optional[List[Dict[str, Any]]] = None,
+    files_skipped: int = 0,
 ) -> None:
     """Insert or update a job's persisted snapshot."""
     init_db()
@@ -98,8 +105,9 @@ def upsert_job(
             """
             INSERT INTO audit_jobs (
                 id, input_identifier, input_type, status, created_at, completed_at,
-                duration, total_files, total_findings, max_severity, error, results_json
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                duration, total_files, total_findings, max_severity, error, results_json,
+                files_skipped
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
                 input_identifier=excluded.input_identifier,
                 input_type=excluded.input_type,
@@ -110,11 +118,13 @@ def upsert_job(
                 total_findings=excluded.total_findings,
                 max_severity=excluded.max_severity,
                 error=excluded.error,
-                results_json=COALESCE(excluded.results_json, audit_jobs.results_json)
+                results_json=COALESCE(excluded.results_json, audit_jobs.results_json),
+                files_skipped=excluded.files_skipped
             """,
             (
                 job_id, input_identifier, input_type, status, created_at, completed_at,
                 duration, total_files, total_findings, max_severity, error, results_json,
+                files_skipped,
             ),
         )
 

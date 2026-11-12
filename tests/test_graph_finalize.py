@@ -3,10 +3,9 @@ import os
 import tempfile
 import unittest
 
-os.makedirs(r"C:\tmp", exist_ok=True)
 os.environ.setdefault(
     "CHROMA_PERSIST_DIRECTORY",
-    tempfile.mkdtemp(prefix="auditor_test_chroma_", dir=r"C:\tmp"),
+    tempfile.mkdtemp(prefix="auditor_test_chroma_"),
 )
 
 from src.graph import finalize_node

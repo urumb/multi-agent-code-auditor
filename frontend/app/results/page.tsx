@@ -133,6 +133,13 @@ export default function ResultsPage() {
                 </div>
             </div>
 
+            {(result.files_skipped ?? 0) > 0 && (
+                <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 p-4 text-sm text-amber-400">
+                    {result.files_skipped} file(s) were not audited because the input exceeded the per-audit file limit.
+                    The smallest files were audited first. Raise <code className="font-mono">MAX_FILES_PER_AUDIT</code> to include more.
+                </div>
+            )}
+
             {/* Per-file report cards */}
             <div className="space-y-4">
                 {result.results.map((file: FileAuditResult) => (

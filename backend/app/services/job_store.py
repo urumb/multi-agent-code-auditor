@@ -1,3 +1,4 @@
+import threading
 import uuid
 import time
 from typing import Any, Dict, List, Optional
@@ -23,12 +24,25 @@ from backend.app.services import db
 # }
 jobs: Dict[str, Dict[str, Any]] = {}
 
+# Jobs are created from request handlers and updated from background-task
+# threads at the same time; this lock guards changes to the ``jobs`` dict and
+# each job's event list so cleanup can't iterate while another thread inserts.
+_lock = threading.RLock()
+
+# Finished jobs' event logs are dropped after this long without updates.
+JOB_TTL_SECONDS = 30 * 60
+# Hard cap on jobs kept in memory; the oldest *finished* jobs are evicted
+# first, so a burst of audits can't grow memory without bound.
+MAX_LIVE_JOBS = 100
+_FINISHED = ("completed", "failed")
+
 
 def create_job(input_identifier: str = "Unknown Input", input_type: str = "unknown") -> str:
     """Create a new job and return its ID."""
+    cleanup_old_jobs()
     now = time.time()
     job_id = str(uuid.uuid4())
-    jobs[job_id] = {
+    job = {
         "status": "pending",
         "events": [],
         "total_files": 0,
@@ -37,7 +51,10 @@ def create_job(input_identifier: str = "Unknown Input", input_type: str = "unkno
         "input_identifier": input_identifier,
         "input_type": input_type,
         "total_findings": 0,
+        "files_skipped": 0,
     }
+    with _lock:
+        jobs[job_id] = job
     # Persist immediately so the job shows up (as "pending"/"running") in
     # history/dashboard views even before it finishes, and so it isn't lost
     # if the backend restarts mid-run.
@@ -58,10 +75,11 @@ def get_job(job_id: str) -> Optional[Dict[str, Any]]:
 
 def add_job_event(job_id: str, event_type: str, payload: dict):
     """Append a structured SSE event to the job's event list."""
-    job = jobs.get(job_id)
-    if job:
-        job["events"].append({"type": event_type, "data": payload})
-        job["last_updated"] = time.time()
+    with _lock:
+        job = jobs.get(job_id)
+        if job:
+            job["events"].append({"type": event_type, "data": payload})
+            job["last_updated"] = time.time()
 
 
 def finalize_job(
@@ -108,11 +126,12 @@ def finalize_job(
         max_severity=max_severity,
         error=error,
         results=results,
+        files_skipped=job.get("files_skipped", 0),
     )
 
 
 def cleanup_old_jobs():
-    """Drop in-memory event history for jobs older than 30 minutes.
+    """Drop in-memory event history for finished jobs that are stale or over the cap.
 
     Safe to do unconditionally now: completed/failed jobs are already
     durably persisted via finalize_job(), so dropping them from memory only
@@ -120,9 +139,19 @@ def cleanup_old_jobs():
     need) — not the audit results themselves.
     """
     now = time.time()
-    expired_keys = [
-        k for k, v in jobs.items()
-        if (now - v["last_updated"]) > 1800  # 30 mins
-    ]
-    for k in expired_keys:
-        del jobs[k]
+    with _lock:
+        expired = [
+            k for k, v in jobs.items()
+            if v["status"] in _FINISHED and (now - v["last_updated"]) > JOB_TTL_SECONDS
+        ]
+        for k in expired:
+            del jobs[k]
+
+        overflow = len(jobs) - MAX_LIVE_JOBS
+        if overflow > 0:
+            finished = sorted(
+                (k for k, v in jobs.items() if v["status"] in _FINISHED),
+                key=lambda k: jobs[k]["last_updated"],
+            )
+            for k in finished[:overflow]:
+                del jobs[k]

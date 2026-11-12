@@ -55,15 +55,6 @@ export function Header() {
 
     const unreadCount = audits.filter((a) => !readIds.has(a.id)).length;
 
-    useEffect(() => {
-        try {
-            const saved = window.localStorage.getItem(READ_STORAGE_KEY);
-            if (saved) setReadIds(new Set(JSON.parse(saved) as string[]));
-        } catch {
-            // ignore
-        }
-    }, []);
-
     const poll = useCallback(async () => {
         if (document.hidden) return;
         const [online, recent] = await Promise.all([checkBackendHealth(), fetchRecentAudits()]);
@@ -72,10 +63,21 @@ export function Header() {
     }, []);
 
     useEffect(() => {
-        poll();
+        // Initial load runs as a callback rather than synchronously in the
+        // effect body, so it doesn't trigger a cascading render on mount.
+        const initial = setTimeout(() => {
+            try {
+                const saved = window.localStorage.getItem(READ_STORAGE_KEY);
+                if (saved) setReadIds(new Set(JSON.parse(saved) as string[]));
+            } catch {
+                // ignore
+            }
+            poll();
+        }, 0);
         const a = setInterval(poll, Math.min(HEALTH_POLL_MS, NOTIF_POLL_MS));
         document.addEventListener("visibilitychange", poll);
         return () => {
+            clearTimeout(initial);
             clearInterval(a);
             document.removeEventListener("visibilitychange", poll);
         };
@@ -91,9 +93,13 @@ export function Header() {
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
-    useEffect(() => {
+    // Close the mobile menu on navigation by adjusting state during render
+    // (React's recommended alternative to a setState-in-effect).
+    const [menuPath, setMenuPath] = useState(pathname);
+    if (menuPath !== pathname) {
+        setMenuPath(pathname);
         setMobileOpen(false);
-    }, [pathname]);
+    }
 
     const markAllAsRead = () => {
         const ids = new Set(audits.map((a) => a.id));

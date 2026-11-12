@@ -1,7 +1,10 @@
 # Author: urumb
+import logging
 import ast
-from typing import Dict, List
+from typing import Dict, List, Tuple
 from ..state import AuditorState
+
+logger = logging.getLogger(__name__)
 
 class ManagerAgent:
     # Each snippet costs one LLM call per analysis agent (security,
@@ -50,6 +53,9 @@ class ManagerAgent:
         return chunks
 
     def split_code(self, code: str) -> List[str]:
+        return self.split_code_with_stats(code)[0]
+
+    def split_code_with_stats(self, code: str) -> Tuple[List[str], int]:
         """
         Splits code into LLM-sized chunks.
 
@@ -59,7 +65,7 @@ class ManagerAgent:
         together to minimize the number of sequential LLM calls.
         """
         if len(code) <= self.CHUNK_CHARS:
-            return [code]
+            return [code], 1
 
         pieces: List[str] = []
         try:
@@ -75,9 +81,10 @@ class ManagerAgent:
             pieces = [code]
 
         chunks = self._pack(pieces, self.CHUNK_CHARS)
-        if len(chunks) > self.MAX_SNIPPETS:
+        total = len(chunks)
+        if total > self.MAX_SNIPPETS:
             chunks = sorted(chunks, key=len, reverse=True)[: self.MAX_SNIPPETS]
-        return chunks
+        return chunks, total
 
     def build_execution_plan(self, code: str, repository_file_count: int = 1, depth: str = "full") -> Dict[str, object]:
         """
@@ -110,11 +117,18 @@ class ManagerAgent:
         """
         Orchestrates decomposition.
         """
-        print("--- Manager Agent: Decomposing Code ---")
+        logger.info("Manager Agent: decomposing code")
         original_code = state.get("original_code", "")
         repository_file_count = state.get("repository_file_count") or 1
-        snippets = self.split_code(original_code)
+        snippets, total_chunks = self.split_code_with_stats(original_code)
         execution_plan = self.build_execution_plan(original_code, repository_file_count, state.get("depth") or "full")
+        execution_plan["chunks_total"] = total_chunks
+        execution_plan["chunks_analyzed"] = len(snippets)
+        if total_chunks > len(snippets):
+            logger.warning(
+                "File split into %d chunks; only the %d largest are analyzed",
+                total_chunks, len(snippets),
+            )
         
         # Update state
         return {

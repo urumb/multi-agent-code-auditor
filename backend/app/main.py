@@ -6,6 +6,7 @@ import os
 import asyncio
 import threading
 import time
+from contextlib import asynccontextmanager
 from typing import List
 
 from pydantic import BaseModel
@@ -59,7 +60,17 @@ MAX_FILES_PER_AUDIT = int(os.getenv("MAX_FILES_PER_AUDIT", "25"))
 # ---------------------------------------------------------------------------
 # FastAPI App
 # ---------------------------------------------------------------------------
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    db.init_db()
+    # Pre-load the model so the first audit doesn't pay the cold-start cost.
+    from src.llm import warm_up_model
+    warm_up_model()
+    yield
+
+
 app = FastAPI(
+    lifespan=lifespan,
     title="Multi-Agent Code Auditor",
     description="Phase 5 — Background SSE streaming and speed optimization.",
     version="0.5.0",
@@ -79,14 +90,6 @@ app.add_middleware(
 )
 
 
-@app.on_event("startup")
-def _on_startup() -> None:
-    db.init_db()
-    # Pre-load the model so the first audit doesn't pay the cold-start cost.
-    from src.llm import warm_up_model
-    warm_up_model()
-
-
 # ---------------------------------------------------------------------------
 # Background Job Execution
 # ---------------------------------------------------------------------------
@@ -97,11 +100,6 @@ def _run_audit_job(job_id: str, code_files: List[CodeFile], depth: str = "full")
         job_id: UUID of the job.
         code_files: List of CodeFile objects to audit.
     """
-    from backend.app.services.job_store import cleanup_old_jobs
-
-    # Prune old jobs from memory whenever a new one starts
-    cleanup_old_jobs()
-
     job = get_job(job_id)
     if not job:
         return
@@ -270,7 +268,12 @@ def _run_audit_job(job_id: str, code_files: List[CodeFile], depth: str = "full")
         # inject top risk files into results so frontend can access them, or emit as a separate event
         # Here we just emit a final top_risk_files event or include in 'done'
         duration = round(time.time() - start_time, 2)
-        add_job_event(job_id, "done", {"total_files": len(results), "duration": duration, "top_risk_files": top_risk_files})
+        add_job_event(job_id, "done", {
+            "total_files": len(results),
+            "files_skipped": job.get("files_skipped", 0),
+            "duration": duration,
+            "top_risk_files": top_risk_files,
+        })
         job["status"] = "completed"
         finalize_job(job_id, "completed", results=results, duration=duration)
 
@@ -410,6 +413,9 @@ def _cap_file_count(code_files: List[CodeFile], job_id: str | None = None) -> Li
     )
     logger.warning(message)
     if job_id:
+        job = get_job(job_id)
+        if job:
+            job["files_skipped"] = skipped
         add_job_event(job_id, "log", {"agent": "System", "message": message, "level": "warning"})
     return kept
 
@@ -720,5 +726,6 @@ def get_audit_history_detail(job_id: str) -> dict:
         "duration": detail.get("duration"),
         "error": detail.get("error"),
         "total_files": detail.get("total_files", 0),
+        "files_skipped": detail.get("files_skipped") or 0,
         "results": detail.get("results", []),
     }

@@ -1,0 +1,7 @@
+target-version = "py312"
+extend-exclude = ["frontend", "local_models", "chroma_db"]
+
+[lint]
+# Start with rules that catch real bugs (syntax errors, undefined names,
+# unused imports/variables). Widen this once the codebase is clean for more.
+select = ["E9", "F"]

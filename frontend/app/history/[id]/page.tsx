@@ -141,6 +141,13 @@ function HistoryDetailView({ id }: { id: string }) {
                 </div>
             </div>
 
+            {(detail.files_skipped ?? 0) > 0 && (
+                <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 p-4 text-sm text-amber-400">
+                    {detail.files_skipped} file(s) were not audited because the input exceeded the per-audit file limit.
+                    The smallest files were audited first. Raise <code className="font-mono">MAX_FILES_PER_AUDIT</code> to include more.
+                </div>
+            )}
+
             {detail.error && (
                 <div className="rounded-lg border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-400">
                     {detail.error}

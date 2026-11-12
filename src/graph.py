@@ -1,4 +1,5 @@
 # Author: urumb
+import logging
 import json
 
 from langgraph.graph import StateGraph, START, END
@@ -9,6 +10,8 @@ from .agents.performance import PerformanceAgent
 from .agents.reviewer import ReviewerAgent
 from .utils.memory import AuditMemory
 from .findings import collect_findings, compute_risk_score
+
+logger = logging.getLogger(__name__)
 
 # Initialize Agents
 manager = ManagerAgent()
@@ -78,10 +81,10 @@ def manager_node(state: AuditorState):
 
 def retrieval_node(state: AuditorState):
     if _planned_agents(state) == {"security"}:
-        print("--- Memory: Skipping Context Retrieval for Small Snippet ---")
+        logger.debug("Memory: skipping context retrieval for fast path")
         return {"past_audits": []}
 
-    print("--- Memory: Retrieving Context ---")
+    logger.info("Memory: retrieving context")
     snippets = state.get("code_snippets", [])
     past_audits = []
     
@@ -93,7 +96,7 @@ def retrieval_node(state: AuditorState):
             results = audit_memory.retrieve_similar(snippets[0], n_results=1)
             past_audits.extend(results)
         except Exception as e:
-            print(f"--- Memory: Error Retrieving Context: {e} ---")
+            logger.warning("Memory: error retrieving context: %s", e)
             pass
     
     # Deduplicate
@@ -150,10 +153,10 @@ def finalize_node(state: AuditorState):
 
 def save_node(state: AuditorState):
     if "reviewer" not in _planned_agents(state):
-        print("--- Memory: Skipping Save for Fast Path ---")
+        logger.debug("Memory: skipping save for fast path")
         return {}
 
-    print("--- Memory: Saving Audit Results ---")
+    logger.info("Memory: saving audit results")
     snippets = state.get("code_snippets", [])
     final_report = state.get("final_report", "")
     security_analysis = state.get("security_analysis", [])

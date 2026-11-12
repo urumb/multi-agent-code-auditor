@@ -1,9 +1,12 @@
 # Author: urumb
+import logging
 from langchain_ollama import ChatOllama
 from ..llm import make_llm, invoke_llm, AuditCancelled, REVIEWER_MAX_TOKENS
 from langchain_core.prompts import ChatPromptTemplate
 from ..config import Config
 from ..state import AuditorState
+
+logger = logging.getLogger(__name__)
 
 class ReviewerAgent:
     def __init__(self):
@@ -72,7 +75,7 @@ class ReviewerAgent:
         }
 
     def run(self, state: AuditorState) -> AuditorState:
-        print("--- Reviewer Agent: Synthesizing Report ---")
+        logger.info("Reviewer Agent: synthesizing report")
         import json
         from ..findings import _extract_json_object, collect_findings, compute_risk_score
         
@@ -143,7 +146,7 @@ class ReviewerAgent:
             raise
         except Exception as e:
             error_msg = f"Error in Reviewer Agent: {str(e)}"
-            print(error_msg)
+            logger.error(error_msg)
             return {"final_report": json.dumps({
                 "Executive Summary": "The Reviewer Agent's narrative synthesis failed, but the findings below were still detected.",
                 "Findings Summary": error_msg,

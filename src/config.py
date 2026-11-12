@@ -1,4 +1,5 @@
 # Author: urumb
+import logging
 import os
 from dotenv import load_dotenv
 
@@ -34,8 +35,16 @@ class Config:
     # read this attribute on every run rather than capturing it once.
     MODEL_NAME = os.getenv("MODEL_NAME", "llama3.2")
 
+    _validated = False
+
     @staticmethod
     def validate():
+        # Runs before every file's audit; only warn once per process.
+        if Config._validated:
+            return
+        Config._validated = True
         if not os.path.exists(Config.OLLAMA_MODELS_DIR):
-             # Just a warning, as Ollama might manage it differently or it might be absolute
-             print(f"Warning: OLLAMA_MODELS path '{Config.OLLAMA_MODELS_DIR}' does not exist locally yet.")
+            # Just a warning, as Ollama might manage it differently or it might be absolute
+            logging.getLogger(__name__).warning(
+                "OLLAMA_MODELS path '%s' does not exist locally yet.", Config.OLLAMA_MODELS_DIR
+            )

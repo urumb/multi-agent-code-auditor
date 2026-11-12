@@ -2,11 +2,7 @@ import unittest
 import os
 import tempfile
 
-os.makedirs(r"C:\tmp", exist_ok=True)
-os.environ["CHROMA_PERSIST_DIRECTORY"] = tempfile.mkdtemp(
-    prefix="auditor_test_chroma_",
-    dir=r"C:\tmp",
-)
+os.environ["CHROMA_PERSIST_DIRECTORY"] = tempfile.mkdtemp(prefix="auditor_test_chroma_")
 
 from src.agents.manager import ManagerAgent
 from src.graph import route_after_manager, route_after_analysis, route_to_planned_agents

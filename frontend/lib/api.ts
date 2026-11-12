@@ -39,6 +39,8 @@ export interface FileAuditResult {
 
 export interface AuditResultResponse {
     total_files: number;
+    /** Files left out because the input exceeded MAX_FILES_PER_AUDIT. */
+    files_skipped?: number;
     results: FileAuditResult[];
 }
 
@@ -66,6 +68,7 @@ export interface AuditHistoryDetail {
     duration: number | null;
     error: string | null;
     total_files: number;
+    files_skipped?: number;
     results: FileAuditResult[];
 }
 
@@ -99,7 +102,7 @@ export interface StreamCallbacks {
     onAgentStarted: (data: AgentLifecycleEvent) => void;
     onAgentCompleted: (data: AgentLifecycleEvent) => void;
     onAgentFailed: (data: AgentLifecycleEvent) => void;
-    onDone: (data: { total_files: number; duration?: number }) => void;
+    onDone: (data: { total_files: number; files_skipped?: number; duration?: number }) => void;
     onError: (error: string) => void;
 }
 
@@ -282,7 +285,7 @@ export async function subscribeToAuditJob(
                             callbacks.onAgentFailed(event.data as AgentLifecycleEvent);
                             break;
                         case "done":
-                            callbacks.onDone(event.data as { total_files: number });
+                            callbacks.onDone(event.data as { total_files: number; files_skipped?: number; duration?: number });
                             break;
                         case "error":
                             callbacks.onError((event.data as { message: string }).message);

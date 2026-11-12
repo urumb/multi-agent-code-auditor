@@ -13,6 +13,7 @@ interface ParsedReport {
     "Executive Summary"?: string;
     "Findings Summary"?: string;
     top_risk_files?: TopRiskFile[];
+    coverage?: { chunks_total: number; chunks_analyzed: number };
     findings?: import("@/lib/findings").RawFinding[];
 }
 
@@ -42,9 +43,17 @@ export function AuditReportView({ file }: { file: FileAuditResult }) {
     const execSummary = data["Executive Summary"] || "";
     const findingsSummary = data["Findings Summary"] || "";
     const topRiskFiles = data.top_risk_files || [];
+    const coverage = data.coverage;
+    const chunksSkipped = coverage ? coverage.chunks_total - coverage.chunks_analyzed : 0;
 
     return (
         <div className="space-y-6">
+            {coverage && chunksSkipped > 0 && (
+                <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 p-4 text-sm text-amber-400">
+                    Partial coverage: this file was too large to analyze fully. Only the {coverage.chunks_analyzed} largest
+                    of {coverage.chunks_total} code chunks were audited ({chunksSkipped} skipped).
+                </div>
+            )}
             {topRiskFiles.length > 0 && (
                 <div className="bg-red-500/10 border border-red-500/20 p-4 rounded-lg">
                     <h4 className="text-sm font-semibold text-red-400 mb-2">Top Risk Files</h4>

@@ -1,4 +1,5 @@
 # Author: urumb
+import json
 import logging
 import threading
 from typing import Any, Callable, Dict, Optional
@@ -11,6 +12,24 @@ logger = logging.getLogger(__name__)
 # Type alias for the optional log callback.
 LogCallback = Optional[Callable[[str, str, str], None]]
 EventCallback = Optional[Callable[[str, Dict[str, Any]], None]]
+
+
+def _attach_coverage(final_report: str, plan: Dict[str, Any]) -> str:
+    """Record how much of the file was actually analyzed in the report, so
+    the UI can say when chunks were skipped instead of implying full coverage."""
+    if "chunks_total" not in plan:
+        return final_report
+    try:
+        report = json.loads(final_report)
+    except (json.JSONDecodeError, TypeError):
+        return final_report
+    if not isinstance(report, dict):
+        return final_report
+    report["coverage"] = {
+        "chunks_total": plan["chunks_total"],
+        "chunks_analyzed": plan.get("chunks_analyzed", plan["chunks_total"]),
+    }
+    return json.dumps(report)
 
 
 def run_audit_on_code(
@@ -73,7 +92,18 @@ def run_audit_on_code(
         output.pop("event_callback", None)
         output.pop("cancel_event", None)
 
-        planned_agents = (output.get("execution_plan") or {}).get("agents", [])
+        plan = output.get("execution_plan") or {}
+        output["final_report"] = _attach_coverage(output.get("final_report", ""), plan)
+        skipped = plan.get("chunks_total", 0) - plan.get("chunks_analyzed", 0)
+        if skipped > 0:
+            _log(
+                "Manager Agent",
+                f"File too large: analyzed the {plan['chunks_analyzed']} largest of "
+                f"{plan['chunks_total']} code chunks ({skipped} skipped)",
+                "warning",
+            )
+
+        planned_agents = plan.get("agents", [])
         if "reviewer" in planned_agents:
             _log("Reviewer Agent", "Synthesizing final report...")
         _log("System", "Pipeline completed successfully", "success")

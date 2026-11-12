@@ -1,10 +1,13 @@
 # Author: urumb
+import logging
 from langchain_ollama import ChatOllama
 from ..llm import make_llm, invoke_llm, AuditCancelled, ANALYSIS_MAX_TOKENS
 from langchain_core.prompts import ChatPromptTemplate
 from ..config import Config
 from ..findings import normalize_findings
 from ..state import AuditorState
+
+logger = logging.getLogger(__name__)
 
 class SecurityAgent:
     def __init__(self):
@@ -46,7 +49,7 @@ If there are no findings, return {{"findings": []}}."""),
         return self._llm_cache[model]
 
     def run(self, state: AuditorState) -> AuditorState:
-        print("--- Security Agent: Scanning for Vulnerabilities ---")
+        logger.info("Security Agent: scanning for vulnerabilities")
         snippets = state.get("code_snippets", [])
         results = []
 
