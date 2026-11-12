@@ -33,10 +33,34 @@ KEEP_ALIVE = "30m"
 _LLM_SLOTS = threading.BoundedSemaphore(max(1, int(os.getenv("LLM_CONCURRENCY", "1"))))
 
 
-def invoke_llm(chain, inputs):
-    """Run ``chain.invoke(inputs)`` while holding one of the LLM slots."""
-    with _LLM_SLOTS:
+# How often a call waiting for a slot re-checks whether its audit was cancelled.
+_SLOT_POLL_SECONDS = 0.25
+
+
+class AuditCancelled(Exception):
+    """Raised instead of making an LLM call once the audit has been abandoned
+    (e.g. its per-file timeout expired). Agents must re-raise it rather than
+    record it as a per-snippet error, so the whole pipeline unwinds quickly."""
+
+
+def invoke_llm(chain, inputs, cancel_event: threading.Event | None = None):
+    """Run ``chain.invoke(inputs)`` while holding one of the LLM slots.
+
+    If ``cancel_event`` is set — before the call starts or while it waits for
+    a slot — raises AuditCancelled instead of calling the model. This stops a
+    timed-out audit, whose thread can't be killed, from holding the slot for
+    all its remaining calls and making the *next* file time out too. A call
+    already running can't be interrupted, but it's bounded by ``num_predict``.
+    """
+    while not _LLM_SLOTS.acquire(timeout=_SLOT_POLL_SECONDS):
+        if cancel_event is not None and cancel_event.is_set():
+            raise AuditCancelled()
+    try:
+        if cancel_event is not None and cancel_event.is_set():
+            raise AuditCancelled()
         return chain.invoke(inputs)
+    finally:
+        _LLM_SLOTS.release()
 
 
 def make_llm(temperature: float, *, max_tokens: int, json_mode: bool = True) -> ChatOllama:

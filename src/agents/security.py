@@ -1,6 +1,6 @@
 # Author: urumb
 from langchain_ollama import ChatOllama
-from ..llm import make_llm, invoke_llm, ANALYSIS_MAX_TOKENS
+from ..llm import make_llm, invoke_llm, AuditCancelled, ANALYSIS_MAX_TOKENS
 from langchain_core.prompts import ChatPromptTemplate
 from ..config import Config
 from ..findings import normalize_findings
@@ -54,12 +54,14 @@ If there are no findings, return {{"findings": []}}."""),
 
         for i, snippet in enumerate(snippets):
             try:
-                response = invoke_llm(chain, {"code": snippet})
+                response = invoke_llm(chain, {"code": snippet}, state.get("cancel_event"))
                 results.append({
                     "snippet_index": i,
                     "analysis": response.content,
                     "findings": normalize_findings(response.content, "security", snippet),
                 })
+            except AuditCancelled:
+                raise
             except Exception as e:
                 results.append({
                     "snippet_index": i,

@@ -1,6 +1,6 @@
 # Author: urumb
 from langchain_ollama import ChatOllama
-from ..llm import make_llm, invoke_llm, REVIEWER_MAX_TOKENS
+from ..llm import make_llm, invoke_llm, AuditCancelled, REVIEWER_MAX_TOKENS
 from langchain_core.prompts import ChatPromptTemplate
 from ..config import Config
 from ..state import AuditorState
@@ -119,7 +119,7 @@ class ReviewerAgent:
                 "performance_reports": perf_text,
                 "quality_reports": qual_text,
                 "past_audits": past_text
-            })
+            }, state.get("cancel_event"))
 
             try:
                 report_json = _extract_json_object(response.content)
@@ -139,6 +139,8 @@ class ReviewerAgent:
                 "top_risk_files": [] # Computed higher up if multiple files
             }
             return {"final_report": json.dumps(final_report_dict)}
+        except AuditCancelled:
+            raise
         except Exception as e:
             error_msg = f"Error in Reviewer Agent: {str(e)}"
             print(error_msg)

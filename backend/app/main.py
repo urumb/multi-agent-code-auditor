@@ -132,7 +132,8 @@ def _run_audit_job(job_id: str, code_files: List[CodeFile], depth: str = "full")
                 "level": "info",
             })
 
-            # Once set, suppresses further events from this file's audit —
+            # Once set, cancels this file's remaining LLM calls and
+            # suppresses further events from its audit —
             # used when we give up waiting on a timed-out run, so a slow
             # background thread that finishes *after* we've already moved on
             # can't append stale/contradictory events (e.g. a late "Pipeline
@@ -158,6 +159,10 @@ def _run_audit_job(job_id: str, code_files: List[CodeFile], depth: str = "full")
                         event_callback=event_callback,
                         repository_file_count=len(code_files),
                         depth=depth,
+                        # Same event: once we give up on this file, its
+                        # remaining LLM calls are skipped so it releases the
+                        # shared LLM slot instead of starving the next file.
+                        cancel_event=abandoned,
                     )
 
                 # Deliberately not a `with` block: ThreadPoolExecutor.__exit__

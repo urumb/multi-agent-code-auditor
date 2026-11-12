@@ -1,5 +1,6 @@
 # Author: urumb
 import logging
+import threading
 from typing import Any, Callable, Dict, Optional
 
 from src.config import Config
@@ -18,6 +19,7 @@ def run_audit_on_code(
     event_callback: EventCallback = None,
     repository_file_count: int = 1,
     depth: str = "full",
+    cancel_event: Optional[threading.Event] = None,
 ) -> Dict[str, Any]:
     """Run the full LangGraph audit pipeline on a single code string.
 
@@ -31,6 +33,8 @@ def run_audit_on_code(
         event_callback: Optional callback ``(event_type, payload)`` invoked
             for structured SSE lifecycle events.
         repository_file_count: Number of files in the original input batch.
+        cancel_event: Optional event; once set, remaining LLM calls are
+            skipped and the pipeline raises AuditCancelled.
 
     Returns:
         Full AuditorState dict after graph execution, including
@@ -53,6 +57,7 @@ def run_audit_on_code(
         "code_snippets": [],
         "execution_plan": {},
         "event_callback": event_callback,
+        "cancel_event": cancel_event,
         "security_analysis": [],
         "performance_analysis": [],
         "quality_analysis": [],
@@ -66,6 +71,7 @@ def run_audit_on_code(
     try:
         output = graph.invoke(initial_state)
         output.pop("event_callback", None)
+        output.pop("cancel_event", None)
 
         planned_agents = (output.get("execution_plan") or {}).get("agents", [])
         if "reviewer" in planned_agents:

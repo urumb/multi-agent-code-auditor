@@ -1,4 +1,5 @@
 # Author: urumb
+import threading
 from typing import TypedDict, List, Dict, Any, Optional, Callable
 
 ExecutionPlan = Dict[str, Any]
@@ -14,6 +15,7 @@ class AuditorState(TypedDict):
     code_snippets: List[str]  # Decomposed functions/blocks
     execution_plan: ExecutionPlan
     event_callback: Optional[EventCallback]
+    cancel_event: Optional[threading.Event]  # set when the audit is abandoned
     
     # Analysis results from agents, mapped by snippet index or ID
     security_analysis: List[Dict[str, Any]] 
