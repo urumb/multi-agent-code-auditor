@@ -35,6 +35,18 @@ class Config:
     # read this attribute on every run rather than capturing it once.
     MODEL_NAME = os.getenv("MODEL_NAME", "llama3.2")
 
+    # Run bandit / ruff (and semgrep, if installed) before the LLM agents.
+    STATIC_ANALYSIS_ENABLED = os.getenv("STATIC_ANALYSIS_ENABLED", "true").lower() == "true"
+
+    # Most findings each analysis agent may report per code chunk. Each extra
+    # finding costs ~130 output tokens, i.e. noticeably slower on a CPU.
+    MAX_FINDINGS_PER_CHUNK = max(1, int(os.getenv("MAX_FINDINGS_PER_CHUNK", "3")))
+
+    # ChromaDB "memory" of past audits. Off by default: it only feeds the
+    # optional LLM reviewer summary, yet costs an embedding-model download
+    # plus a vector lookup and write on every audit.
+    MEMORY_ENABLED = os.getenv("MEMORY_ENABLED", "false").lower() == "true"
+
     _validated = False
 
     @staticmethod

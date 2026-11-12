@@ -1,11 +1,14 @@
 # Author: urumb
-import chromadb
 import uuid
 from typing import List
 from ..config import Config
 
 class AuditMemory:
     def __init__(self):
+        # Imported lazily: chromadb is slow to import and only needed when
+        # MEMORY_ENABLED=true.
+        import chromadb
+
         # Initialize Chroma Client with persistence
         self.client = chromadb.PersistentClient(path=Config.CHROMA_PERSIST_DIRECTORY)
         self.collection = self.client.get_or_create_collection(name="code_audits")

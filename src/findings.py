@@ -1,7 +1,7 @@
 # Author: urumb
 import json
 import re
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -29,6 +29,14 @@ class Finding(BaseModel):
     after_code: str = ""
     cwe: str = ""
     agent: str = Field(default="", exclude=False)
+    # 1-based line in the audited file. Set by static analyzers directly, or
+    # for LLM findings by locating ``before_code`` in the source; None when
+    # the quoted code can't be found (so the UI never shows a made-up line).
+    line: Optional[int] = None
+    # Who reported it: "llm", a tool name ("bandit", "ruff", "semgrep"), or
+    # several joined with "+" when duplicates were merged.
+    source: str = "llm"
+    rule_id: str = ""
 
 
 def _loads(text: str) -> Any:
@@ -207,3 +215,113 @@ def compute_risk_score(findings: List[Dict[str, Any]]) -> Dict[str, Any]:
         "risk_breakdown": {key: round(value, 2) for key, value in breakdown.items()},
         "max_severity": max_severity if findings else "Low",
     }
+
+
+SEVERITY_ORDER = ["Critical", "High", "Medium", "Low"]
+_MIN_ANCHOR_CHARS = 8
+
+
+def _squash(text: str) -> str:
+    return " ".join(text.split())
+
+
+def locate_line(before_code: str, code_lines: List[str]) -> Optional[int]:
+    """Find the 1-based line in the file where ``before_code`` appears.
+
+    LLMs quote code loosely (re-indented, trimmed, sometimes several lines),
+    so each substantial quoted line is compared whitespace-insensitively
+    against each source line. Returns None rather than guessing.
+    """
+    squashed_source = [_squash(line) for line in code_lines]
+    for raw in (before_code or "").splitlines():
+        candidate = _squash(raw)
+        if len(candidate) < _MIN_ANCHOR_CHARS:
+            continue
+        for idx, source_line in enumerate(squashed_source):
+            if candidate in source_line:
+                return idx + 1
+        for idx, source_line in enumerate(squashed_source):
+            if len(source_line) >= _MIN_ANCHOR_CHARS and source_line in candidate:
+                return idx + 1
+    return None
+
+
+def _merge_pair(kept: Dict[str, Any], dup: Dict[str, Any]) -> None:
+    """Fold ``dup`` into ``kept``: highest severity, the richer LLM text,
+    and every source/rule that reported it."""
+    if SEVERITY_ORDER.index(_normalize_severity(dup.get("severity"))) < SEVERITY_ORDER.index(
+        _normalize_severity(kept.get("severity"))
+    ):
+        kept["severity"] = _normalize_severity(dup.get("severity"))
+    if dup.get("source") == "llm" and kept.get("source") != "llm":
+        for key in ("issue", "explanation", "suggested_fix", "after_code"):
+            if dup.get(key):
+                kept[key] = dup[key]
+    for key in ("cwe", "rule_id", "after_code", "suggested_fix"):
+        if not kept.get(key) and dup.get(key):
+            kept[key] = dup[key]
+    sources = set(str(kept.get("source") or "llm").split("+")) | set(str(dup.get("source") or "llm").split("+"))
+    kept["source"] = "+".join(sorted(sources))
+
+
+def _is_duplicate(a: Dict[str, Any], b: Dict[str, Any]) -> bool:
+    if a.get("agent") != b.get("agent"):
+        return False
+    if a.get("line") is not None and a.get("line") == b.get("line"):
+        both_tools = a.get("source") != "llm" and b.get("source") != "llm"
+        # Two different tool rules on one line are two different problems.
+        return not (both_tools and a.get("rule_id") != b.get("rule_id"))
+    if a.get("line") is None and b.get("line") is None:
+        return _squash(str(a.get("issue", ""))).lower() == _squash(str(b.get("issue", ""))).lower()
+    return False
+
+
+def merge_findings(
+    llm_findings: List[Dict[str, Any]],
+    static_findings: Optional[List[Dict[str, Any]]] = None,
+    original_code: str = "",
+) -> List[Dict[str, Any]]:
+    """Combine LLM and static-analysis findings into one de-duplicated list.
+
+    - LLM findings get a verified line number when their quoted code is found.
+    - The same problem reported twice (same agent and line, e.g. bandit and
+      the Security Agent both flagging one SQL query) becomes one finding.
+    - Output is sorted most severe first, then by line.
+    """
+    code_lines = original_code.splitlines()
+    combined: List[Dict[str, Any]] = []
+    for finding in static_findings or []:
+        combined.append(dict(finding))
+    for finding in llm_findings:
+        copied = dict(finding)
+        copied.setdefault("source", "llm")
+        if copied.get("line") is None and code_lines:
+            copied["line"] = locate_line(copied.get("before_code", ""), code_lines)
+        combined.append(copied)
+
+    merged: List[Dict[str, Any]] = []
+    for finding in combined:
+        for kept in merged:
+            if _is_duplicate(kept, finding):
+                _merge_pair(kept, finding)
+                break
+        else:
+            merged.append(finding)
+
+    def sort_key(f: Dict[str, Any]):
+        sev = _normalize_severity(f.get("severity"))
+        line = f.get("line")
+        return (SEVERITY_ORDER.index(sev), line is None, line or 0)
+
+    merged.sort(key=sort_key)
+    return merged
+
+
+def build_findings(state: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """All findings for one audited file, from every agent and tool."""
+    llm = collect_findings(
+        state.get("security_analysis", []),
+        state.get("performance_analysis", []),
+        state.get("quality_analysis", []),
+    )
+    return merge_findings(llm, state.get("static_findings", []), state.get("original_code", ""))

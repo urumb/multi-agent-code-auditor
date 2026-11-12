@@ -1,5 +1,6 @@
 target-version = "py312"
-extend-exclude = ["frontend", "local_models", "chroma_db"]
+# benchmarks/cases holds deliberately buggy sample code.
+extend-exclude = ["frontend", "local_models", "chroma_db", "benchmarks/cases"]
 
 [lint]
 # Start with rules that catch real bugs (syntax errors, undefined names,

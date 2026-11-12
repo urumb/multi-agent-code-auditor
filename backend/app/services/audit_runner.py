@@ -39,6 +39,7 @@ def run_audit_on_code(
     repository_file_count: int = 1,
     depth: str = "full",
     cancel_event: Optional[threading.Event] = None,
+    file_path: str = "input.py",
 ) -> Dict[str, Any]:
     """Run the full LangGraph audit pipeline on a single code string.
 
@@ -54,6 +55,8 @@ def run_audit_on_code(
         repository_file_count: Number of files in the original input batch.
         cancel_event: Optional event; once set, remaining LLM calls are
             skipped and the pipeline raises AuditCancelled.
+        file_path: Path of the audited file; its extension picks the
+            static analyzers to run.
 
     Returns:
         Full AuditorState dict after graph execution, including
@@ -71,6 +74,8 @@ def run_audit_on_code(
 
     initial_state = {
         "original_code": code,
+        "file_path": file_path,
+        "static_findings": [],
         "repository_file_count": repository_file_count,
         "depth": depth,
         "code_snippets": [],

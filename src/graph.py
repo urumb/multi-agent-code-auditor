@@ -9,7 +9,9 @@ from .agents.security import SecurityAgent
 from .agents.performance import PerformanceAgent
 from .agents.reviewer import ReviewerAgent
 from .utils.memory import AuditMemory
-from .findings import collect_findings, compute_risk_score
+from .config import Config
+from .findings import build_findings, compute_risk_score
+from .static_analysis import run_static_analysis
 
 logger = logging.getLogger(__name__)
 
@@ -79,7 +81,30 @@ def manager_node(state: AuditorState):
         _emit(state, "agent_failed", agent_name)
         raise
 
+def static_node(state: AuditorState):
+    """Run bandit/ruff/semgrep once over the whole file before the LLM agents.
+
+    Only findings for agents in the execution plan are kept, so a Quick
+    (security-only) scan doesn't report quality/performance lint.
+    """
+    planned = _planned_agents(state)
+    findings = [
+        f for f in run_static_analysis(state.get("original_code", ""), state.get("file_path") or "input.py")
+        if f.get("agent") in planned
+    ]
+    if findings:
+        tools = sorted({f["source"] for f in findings})
+        _emit_payload(state, "log", {
+            "agent": "Static Analysis",
+            "message": f"{len(findings)} issue(s) flagged by {', '.join(tools)}",
+            "level": "info",
+        })
+    return {"static_findings": findings}
+
+
 def retrieval_node(state: AuditorState):
+    if not Config.MEMORY_ENABLED:
+        return {"past_audits": []}
     if _planned_agents(state) == {"security"}:
         logger.debug("Memory: skipping context retrieval for fast path")
         return {"past_audits": []}
@@ -127,17 +152,13 @@ def finalize_node(state: AuditorState):
     if state.get("final_report"):
         return {}
 
-    security_data = state.get("security_analysis", [])
-    performance_data = state.get("performance_analysis", [])
-    quality_data = state.get("quality_analysis", [])
-
-    all_findings = collect_findings(security_data, performance_data, quality_data)
+    all_findings = build_findings(state)
     risk_info = compute_risk_score(all_findings)
 
     if all_findings:
-        summary = f"{len(all_findings)} finding(s) detected by the Security Agent fast path."
+        summary = f"{len(all_findings)} finding(s) detected by the Security Agent and static analysis."
     else:
-        summary = "No issues were detected by the Security Agent fast path."
+        summary = "No issues were detected by the Security Agent or static analysis."
 
     return {
         "final_report": json.dumps({
@@ -152,6 +173,8 @@ def finalize_node(state: AuditorState):
     }
 
 def save_node(state: AuditorState):
+    if not Config.MEMORY_ENABLED:
+        return {}
     if "reviewer" not in _planned_agents(state):
         logger.debug("Memory: skipping save for fast path")
         return {}
@@ -198,6 +221,7 @@ def route_after_analysis(state: AuditorState):
 builder = StateGraph(AuditorState)
 
 builder.add_node("manager", manager_node)
+builder.add_node("static", static_node)
 builder.add_node("retrieve", retrieval_node)
 builder.add_node("security", security_node)
 builder.add_node("performance", performance_node)
@@ -208,7 +232,8 @@ builder.add_node("save", save_node)
 
 # Flow
 builder.add_edge(START, "manager")
-builder.add_conditional_edges("manager", route_after_manager, {
+builder.add_edge("manager", "static")
+builder.add_conditional_edges("static", route_after_manager, {
     "retrieve": "retrieve",
     "security": "security",
 })

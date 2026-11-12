@@ -1,0 +1,115 @@
+# Offline semgrep rules used by src/static_analysis.py when semgrep is
+# installed. Written for this project (no registry download, no login).
+# Python is already covered by bandit + ruff, so these focus on JS/TS.
+# Add your own rules here, or point SEMGREP_RULES at another file.
+rules:
+  - id: js-eval-call
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: eval() runs arbitrary code; if any part of the argument is user-controlled this is code injection.
+    metadata:
+      category: security
+      title: Use of eval
+      cwe: "CWE-95: Eval Injection"
+    pattern-either:
+      - pattern: eval(...)
+      - pattern: new Function(...)
+
+  - id: js-inner-html-assignment
+    languages: [javascript, typescript]
+    severity: WARNING
+    message: Assigning to innerHTML/outerHTML with dynamic content allows cross-site scripting. Use textContent or sanitize first.
+    metadata:
+      category: security
+      title: Unsafe innerHTML assignment
+      cwe: "CWE-79: Cross-site Scripting"
+    patterns:
+      - pattern-either:
+          - pattern: $EL.innerHTML = $VAL
+          - pattern: $EL.outerHTML = $VAL
+      - pattern-not: $EL.innerHTML = "..."
+      - pattern-not: $EL.outerHTML = "..."
+
+  - id: js-document-write
+    languages: [javascript, typescript]
+    severity: WARNING
+    message: document.write with dynamic content allows cross-site scripting.
+    metadata:
+      category: security
+      title: Use of document.write
+      cwe: "CWE-79: Cross-site Scripting"
+    patterns:
+      - pattern: document.write($VAL)
+      - pattern-not: document.write("...")
+
+  - id: js-child-process-exec
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: Building a shell command from dynamic input allows command injection. Use execFile/spawn with an argument array.
+    metadata:
+      category: security
+      title: Shell command built from input
+      cwe: "CWE-78: OS Command Injection"
+    patterns:
+      - pattern-either:
+          - pattern: $CP.exec($CMD, ...)
+          - pattern: $CP.execSync($CMD, ...)
+          - pattern: exec($CMD, ...)
+          - pattern: execSync($CMD, ...)
+      - pattern-not: $CP.exec("...", ...)
+      - pattern-not: $CP.execSync("...", ...)
+      - pattern-not: exec("...", ...)
+      - pattern-not: execSync("...", ...)
+
+  - id: js-sql-string-concat
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: SQL built by string concatenation or template literal allows SQL injection. Use parameterized queries.
+    metadata:
+      category: security
+      title: SQL built from strings
+      cwe: "CWE-89: SQL Injection"
+    patterns:
+      - pattern-either:
+          - pattern: $DB.$METHOD($LEFT + $RIGHT, ...)
+          - pattern: $DB.$METHOD(`...${$X}...`, ...)
+      - metavariable-regex:
+          metavariable: $METHOD
+          regex: ^(query|execute|raw)$
+      - pattern-regex: (?i)\b(select|insert|update|delete)\b
+
+  - id: js-hardcoded-secret
+    languages: [javascript, typescript]
+    severity: WARNING
+    message: Credential appears to be hardcoded in source. Load it from the environment or a secret store.
+    metadata:
+      category: security
+      title: Hardcoded credential
+      cwe: "CWE-798: Use of Hard-coded Credentials"
+    patterns:
+      - pattern-either:
+          - pattern: const $NAME = "$VALUE"
+          - pattern: let $NAME = "$VALUE"
+          - pattern: var $NAME = "$VALUE"
+      - metavariable-regex:
+          metavariable: $NAME
+          regex: (?i).*(password|passwd|secret|api_?key|token|private_?key).*
+      - metavariable-regex:
+          metavariable: $VALUE
+          regex: .{6,}
+
+  - id: js-math-random-token
+    languages: [javascript, typescript]
+    severity: WARNING
+    message: Math.random() is not cryptographically secure; use crypto.randomBytes / crypto.getRandomValues for tokens and IDs.
+    metadata:
+      category: security
+      title: Insecure randomness
+      cwe: "CWE-338: Weak PRNG"
+    patterns:
+      - pattern: Math.random()
+      - pattern-inside: |
+          function $F(...) { ... }
+      - metavariable-regex:
+          metavariable: $F
+          regex: (?i).*(token|secret|password|session|nonce|key|id).*

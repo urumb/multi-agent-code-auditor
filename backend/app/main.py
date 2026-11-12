@@ -161,6 +161,7 @@ def _run_audit_job(job_id: str, code_files: List[CodeFile], depth: str = "full")
                         # remaining LLM calls are skipped so it releases the
                         # shared LLM slot instead of starving the next file.
                         cancel_event=abandoned,
+                        file_path=file.path,
                     )
 
                 # Deliberately not a `with` block: ThreadPoolExecutor.__exit__
@@ -427,7 +428,9 @@ def _run_audit_on_files(code_files: List[CodeFile]) -> AuditResultResponse:
     def _process_file(file):
         logger.info("[AUDIT] Processing: %s", file.path)
         try:
-            output = run_audit_on_code(file.content, repository_file_count=len(code_files))
+            output = run_audit_on_code(
+                file.content, repository_file_count=len(code_files), file_path=file.path
+            )
             final_report_str = output.get("final_report", "")
             risk_score = 0.0
             max_severity = "Low"

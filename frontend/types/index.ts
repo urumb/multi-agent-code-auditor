@@ -27,10 +27,14 @@ export interface Finding {
     title: string;
     description: string;
     file: string;
-    /** Line number, when the backend can provide one (it currently can't —
-     * agents work on decomposed snippets, not raw line ranges). Omitted
-     * from display rather than showing a fabricated value. */
+    /** 1-based line in the file. Exact for static-analysis findings; for LLM
+     * findings it's set only when the quoted code was found in the source,
+     * so a missing line means "couldn't verify", never a guess. */
     line?: number;
+    /** Who reported it: "llm", "bandit", "ruff", "semgrep", or e.g. "bandit+llm". */
+    source?: string;
+    /** Rule identifier from a static analyzer (e.g. "B608", "F821"). */
+    ruleId?: string;
     codeSnippet: string;
     suggestedFix: string;
     agent: string;

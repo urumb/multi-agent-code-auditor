@@ -77,7 +77,7 @@ class ReviewerAgent:
     def run(self, state: AuditorState) -> AuditorState:
         logger.info("Reviewer Agent: synthesizing report")
         import json
-        from ..findings import _extract_json_object, collect_findings, compute_risk_score
+        from ..findings import _extract_json_object, build_findings, compute_risk_score
         
         security_data = state.get("security_analysis", [])
         performance_data = state.get("performance_analysis", [])
@@ -107,7 +107,7 @@ class ReviewerAgent:
         # Computed up front (doesn't depend on the LLM call) so a synthesis
         # failure below never discards the real findings the other three
         # agents already produced.
-        all_findings = collect_findings(security_data, performance_data, quality_data)
+        all_findings = build_findings(state)
         risk_info = compute_risk_score(all_findings)
 
         if not Config.REVIEWER_USE_LLM:

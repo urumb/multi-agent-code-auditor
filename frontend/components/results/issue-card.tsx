@@ -4,6 +4,7 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import type { Finding } from "@/types";
 import { SeverityBadge } from "./severity-badge";
+import { languageForFile, sourceLabel } from "@/lib/findings";
 import dynamic from "next/dynamic";
 
 // Prism highlighter is heavy; load it only when an issue card is expanded.
@@ -68,6 +69,13 @@ export function IssueCard({ finding, index = 0 }: IssueCardProps) {
                             <span className="text-xs text-muted-foreground">
                                 {finding.agent}
                             </span>
+                            <span
+                                className="inline-flex items-center rounded-md bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground ring-1 ring-inset ring-border"
+                                title={finding.ruleId ? `Rule ${finding.ruleId}` : "Reported by"}
+                            >
+                                {sourceLabel(finding.source)}
+                                {finding.ruleId ? ` · ${finding.ruleId}` : ""}
+                            </span>
                         </div>
                         <h4 className="text-sm font-semibold text-foreground">
                             {finding.title}
@@ -113,7 +121,7 @@ export function IssueCard({ finding, index = 0 }: IssueCardProps) {
                         </p>
                         <CodeViewer
                             code={finding.before_code || finding.codeSnippet}
-                            language="python"
+                            language={languageForFile(finding.file)}
                             highlightLine={1}
                         />
                     </div>
@@ -147,7 +155,13 @@ export function IssueCard({ finding, index = 0 }: IssueCardProps) {
                                 )}
                             </button>
                         </div>
-                        <CodeViewer code={finding.after_code || finding.suggestedFix} language="python" />
+                        {finding.after_code ? (
+                            <CodeViewer code={finding.after_code} language={languageForFile(finding.file)} />
+                        ) : (
+                            <p className="text-sm text-muted-foreground leading-relaxed break-words">
+                                {finding.suggestedFix || "No fix suggested."}
+                            </p>
+                        )}
                     </div>
                 </div>
             )}

@@ -11,6 +11,9 @@ export interface RawFinding {
     cwe?: string;
     agent?: string;
     snippet_index?: number;
+    line?: number | null;
+    source?: string;
+    rule_id?: string;
 }
 
 const SEVERITY_MAP: Record<string, Severity> = {
@@ -46,9 +49,34 @@ export function mapFinding(raw: RawFinding, index: number, filePath: string): Fi
         suggestedFix: raw.suggested_fix || "",
         agent: raw.agent ? raw.agent.charAt(0).toUpperCase() + raw.agent.slice(1) : "Unknown",
         cwe: raw.cwe || undefined,
+        line: raw.line ?? undefined,
+        source: raw.source || undefined,
+        ruleId: raw.rule_id || undefined,
         before_code: raw.before_code || "",
         after_code: raw.after_code || "",
     };
+}
+
+const LANGUAGE_BY_EXTENSION: Record<string, string> = {
+    py: "python", js: "javascript", jsx: "jsx", ts: "typescript", tsx: "tsx",
+    java: "java", go: "go", rb: "ruby", php: "php", rs: "rust", cs: "csharp",
+    c: "c", h: "c", cpp: "cpp", hpp: "cpp", kt: "kotlin", swift: "swift",
+    sh: "bash", sql: "sql",
+};
+
+/** Syntax-highlighting language for a file path (falls back to plain text). */
+export function languageForFile(filePath: string): string {
+    const ext = filePath.split(".").pop()?.toLowerCase() ?? "";
+    return LANGUAGE_BY_EXTENSION[ext] ?? "text";
+}
+
+/** Human label for who reported a finding, e.g. "bandit + AI". */
+export function sourceLabel(source?: string): string {
+    if (!source) return "AI";
+    return source
+        .split("+")
+        .map((s) => (s === "llm" ? "AI" : s))
+        .join(" + ");
 }
 
 export function mapFindings(raw: RawFinding[] | undefined, filePath: string): Finding[] {

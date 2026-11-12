@@ -7,6 +7,9 @@ An AI-powered, multi-agent, local-first code auditing system.
 ## ✨ Features
 
 - 🧠 **Multi-Agent Architecture**: Collaborative agents (Manager, Security, Performance, Quality, Reviewer) orchestrated via LangGraph.
+- 🔬 **Static Analysis + AI**: bandit and ruff (plus semgrep, if installed) scan every file first with exact line numbers; the AI agents are told what the tools found and look for what they missed. Duplicate reports are merged into one finding.
+- 📍 **Verified Line Numbers**: Every finding shows where it is. AI findings only get a line when their quoted code is actually found in the file — never a guess.
+- 📊 **Benchmark**: Labeled sample files measure how many real issues are found and how many reports are wrong (see *Benchmark*).
 - 📦 **Three Ways In**: Audit a public GitHub repository (any `github.com/owner/repo` or `/tree/branch` URL), upload source files or a `.zip`, or paste code with a language selector.
 - 🗂️ **Persistent History**: Every audit is stored in a local SQLite file, so past reports survive restarts.
 - 🎨 **Clean, Fast UI**: Dark editorial interface with CSS-driven transitions, lazy-loaded heavy libraries, and no exit-animation lag.
@@ -23,17 +26,17 @@ An AI-powered, multi-agent, local-first code auditing system.
 ```mermaid
 graph TD
     A[Code Input] --> B[Manager Agent]
-    B --> C[(ChromaDB Memory)]
+    B --> S[Static Analysis<br/>bandit · ruff · semgrep]
 
-    C --> D[Security Agent]
-    C --> E[Performance Agent]
-    C --> F[Code Quality Agent]
+    S --> D[Security Agent]
+    S --> E[Performance Agent]
+    S --> F[Code Quality Agent]
 
     D --> G[Reviewer Agent]
     E --> G
     F --> G
 
-    G --> H[Final Report]
+    G --> H[Final Report<br/>merged, de-duplicated, line numbers]
 ```
 
 ---
@@ -43,8 +46,9 @@ graph TD
 **Backend**
 - Python 3.12+
 - FastAPI (Async endpoints & BackgroundTasks)
-- LangGraph (Agent Orchestestrator)
-- ChromaDB (Vector Store)
+- LangGraph (Agent Orchestrator)
+- bandit, ruff, semgrep (optional) for static analysis
+- ChromaDB (optional "memory" of past audits; off by default, enable with `MEMORY_ENABLED=true`)
 
 **Frontend**
 - Next.js 16 (App Router)
@@ -125,10 +129,37 @@ npm start
 
 1. **Dashboard**: Navigate to `http://localhost:3000/audit`.
 2. **Submit Source Code**: Provide a public GitHub URL, upload files or a `.zip`, or paste raw code.
-   Supported: `.py .js .jsx .ts .tsx .java .c .cpp .cs .go .rb .php .rs .kt .swift`. Large repos are capped to the 60 smallest files per run.
+   Supported: `.py .js .jsx .ts .tsx .java .c .cpp .cs .go .rb .php .rs .kt .swift`. Large repos are capped to the `MAX_FILES_PER_AUDIT` smallest files per run (default 25); the report says how many were skipped.
 3. **Execute**: Click "Run Audit".
 4. **Monitor**: View live logs tracking exactly what the internal agents are analyzing. (You may safely navigate away—the audit continues running in the background and reconnects instantly upon return).
 5. **Review**: Read the synthesized structural and security improvements outputted by the Reviewer Agent.
+
+---
+
+## 🔬 Static Analysis
+
+Before the AI agents run, each file is scanned by real analyzers. They never execute your code — they only read it.
+
+| Tool | Languages | Reports | Installed |
+|---|---|---|---|
+| bandit | Python | Security | Yes (`requirements.txt`) |
+| ruff | Python | Quality, Performance | Yes (`requirements.txt`) |
+| semgrep | JS / TS (bundled rules in `rules/semgrep.yml`) | Security | Optional: `pip install semgrep` |
+
+semgrep runs fully offline against the bundled rule file with metrics disabled; nothing is downloaded or uploaded. Point `SEMGREP_RULES` at your own rule file to extend it. Set `STATIC_ANALYSIS_ENABLED=false` to turn the pre-pass off.
+
+---
+
+## 📊 Benchmark
+
+`benchmarks/cases/` holds small sample files with known issues, each marked with a trailing `# EXPECT: <category>` comment (stripped before auditing). The script reports **recall** (share of known issues found) and **precision** (share of reported findings that are real):
+
+```bash
+python -m benchmarks.run_benchmark --static-only -v   # tools only, no Ollama needed (~15s)
+python -m benchmarks.run_benchmark -v                 # full pipeline, needs Ollama running
+```
+
+Run it before and after changing prompts, models or rules to see whether results actually improved. The static-only run is also enforced in CI (`tests/test_batch2_findings.py`), so a change that makes the tools miss known issues or flag clean code fails the build.
 
 ---
 
@@ -148,6 +179,7 @@ Local LLMs are the bottleneck, especially on CPU-only machines (typically ~10 to
 - Small files are analyzed in a single call per agent; larger files are split into ~3000-character chunks (not one call per function).
 - LLM calls take turns instead of competing for the same CPU cores (set `LLM_CONCURRENCY` higher only if you have a GPU).
 - The Reviewer's executive summary is generated instantly from the merged findings. Set `REVIEWER_USE_LLM=true` to have the model write it instead (one extra call per file).
+- Each agent reports up to `MAX_FINDINGS_PER_CHUNK` findings per chunk (default 3). Lower it for speed, raise it for thoroughness; each extra finding costs ~130 output tokens.
 - Repository audits skip near-empty files and are capped at `MAX_FILES_PER_AUDIT` files per run (default 25).
 
 Rough timings on a laptop CPU with `llama3.2`: Quick ~20-35s per file, Full ~1-2 min per file. For faster audits, use *Quick*, or pull a smaller model (`ollama pull llama3.2:1b`) and select it in Settings. Settings only lists models that are actually installed in Ollama.

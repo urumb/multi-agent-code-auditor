@@ -10,6 +10,7 @@ class AuditorState(TypedDict):
     Shared state key-value store for the Multi-Agent Auditor.
     """
     original_code: str
+    file_path: Optional[str]  # used for the file extension (language) only
     repository_file_count: Optional[int]
     depth: Optional[str]  # "quick" (security only) or "full" (all agents)
     code_snippets: List[str]  # Decomposed functions/blocks
@@ -22,6 +23,9 @@ class AuditorState(TypedDict):
     performance_analysis: List[Dict[str, Any]]
     quality_analysis: List[Dict[str, Any]]
     
+    # Findings from bandit / ruff / semgrep (see static_analysis.py)
+    static_findings: List[Dict[str, Any]]
+
     # Context retrieved from memory (ChromaDB)
     past_audits: List[str]
     

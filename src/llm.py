@@ -18,8 +18,8 @@ from langchain_ollama import ChatOllama
 
 from .config import Config
 
-# Output caps per role (tokens).
-ANALYSIS_MAX_TOKENS = 260
+# Output cap for the reviewer (analysis agents size theirs from
+# Config.MAX_FINDINGS_PER_CHUNK; see agents/base.py).
 REVIEWER_MAX_TOKENS = 160
 NUM_CTX = 4096
 KEEP_ALIVE = "30m"
