@@ -115,14 +115,14 @@ def retrieval_node(state: AuditorState):
     
     # Retrieve context for each snippet (limit to top 1 to avoid context overflow)
     # Only retrieve context once for the entire file to save time (just use the first snippet)
-    audit_memory = _get_memory()
     if snippets:
+        # Memory is optional: any failure (including chromadb not being
+        # installed) is logged and the audit continues without it.
         try:
-            results = audit_memory.retrieve_similar(snippets[0], n_results=1)
+            results = _get_memory().retrieve_similar(snippets[0], n_results=1)
             past_audits.extend(results)
         except Exception as e:
             logger.warning("Memory: error retrieving context: %s", e)
-            pass
     
     # Deduplicate
     unique_audits = list(set(past_audits))
@@ -191,8 +191,11 @@ def save_node(state: AuditorState):
         vulns = [s.get('analysis') for s in security_analysis if 'analysis' in s]
         summary_finding = f"Report Logic Summary:\n{final_report[:200]}...\nVulnerabilities: {len(vulns)} found."
         
-        _get_memory().save_audit(snippets[0], summary_finding, tags=["audit", "v1"])
-        
+        try:
+            _get_memory().save_audit(snippets[0], summary_finding, tags=["audit", "v1"])
+        except Exception as e:
+            logger.warning("Memory: error saving audit: %s", e)
+
     return {}
 
 def route_after_manager(state: AuditorState):

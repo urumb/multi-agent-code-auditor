@@ -48,7 +48,7 @@ graph TD
 - FastAPI (Async endpoints & BackgroundTasks)
 - LangGraph (Agent Orchestrator)
 - bandit, ruff, semgrep (optional) for static analysis
-- ChromaDB (optional "memory" of past audits; off by default, enable with `MEMORY_ENABLED=true`)
+- ChromaDB (optional "memory" of past audits; not installed by default: `pip install -r requirements-memory.txt` and set `MEMORY_ENABLED=true`)
 
 **Frontend**
 - Next.js 16 (App Router)
@@ -197,8 +197,12 @@ With a small local model the AI agents add little beyond the tools and introduce
 
 ---
 
-## 🔐 Privacy & Git Hygiene
+## 🔐 Privacy, Security & Cost
 
+- **Free:** every component is free and open source. There are no API keys, accounts, paid services or cloud calls. CI runs on GitHub Actions, which is free for public repositories.
+- **Your code stays on your machine:** the LLM runs in your local Ollama, and the static analyzers only read files locally; nothing executes the audited code. The only network access is cloning a public GitHub repository when you ask for one, and downloading models or packages when you install them.
+- **No telemetry:** Next.js usage telemetry is switched off in `frontend/next.config.ts`, ChromaDB's is switched off in `src/utils/memory.py`, semgrep runs with `--metrics=off`, and LangSmith tracing is never enabled.
+- **Dependencies are audited:** CI runs `pip-audit` and `npm audit` on every push and once a week, and fails if a known vulnerability appears. For extra coverage, turn on free Dependabot alerts in the repository's *Settings → Code security*.
 - Everything the app stores lives in `data/` (audit history database, optional ChromaDB memory); set `DATA_DIR` to move it. Data from older versions in the project root is moved there automatically on first start. `data/`, `.env`, virtualenvs and build output are all in `.gitignore`. They contain your code and findings, so never commit them.
 - The backend has no authentication and only allows CORS from `FRONTEND_ORIGINS` (default: `localhost:3000`). Keep it bound to localhost unless you add auth.
 - Private GitHub repositories are not supported (no tokens are ever requested or stored).

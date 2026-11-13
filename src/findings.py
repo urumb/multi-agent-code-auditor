@@ -250,11 +250,20 @@ def locate_line(before_code: str, code_lines: List[str]) -> Optional[int]:
 
 
 def _merge_pair(kept: Dict[str, Any], dup: Dict[str, Any]) -> None:
-    """Fold ``dup`` into ``kept``: highest severity, the richer LLM text,
-    and every source/rule that reported it."""
-    if SEVERITY_ORDER.index(_normalize_severity(dup.get("severity"))) < SEVERITY_ORDER.index(
+    """Fold ``dup`` into ``kept``: the richer LLM text, every source/rule
+    that reported it, and the severity (see below)."""
+    tool_involved = "llm" != kept.get("source") or "llm" != dup.get("source")
+    if kept.get("agent") != "security" and tool_involved:
+        # For quality/performance a deterministic tool's rating is reliable
+        # and LLMs inflate it (ruff "unused import" Low came back Critical),
+        # so the tool's severity wins.
+        tool = kept if kept.get("source") != "llm" else dup
+        kept["severity"] = _normalize_severity(tool.get("severity"))
+    elif SEVERITY_ORDER.index(_normalize_severity(dup.get("severity"))) < SEVERITY_ORDER.index(
         _normalize_severity(kept.get("severity"))
     ):
+        # For security, tools under-rate as often as LLMs over-rate (bandit
+        # calls SQL injection Medium), so keep the higher rating.
         kept["severity"] = _normalize_severity(dup.get("severity"))
     if dup.get("source") == "llm" and kept.get("source") != "llm":
         for key in ("issue", "explanation", "suggested_fix", "after_code"):
@@ -325,6 +334,10 @@ def merge_findings(
     for finding in llm_findings:
         copied = dict(finding)
         copied.setdefault("source", "llm")
+        # Critical is reserved for security: a small model calling a slow
+        # loop or a missing type hint "Critical" buries the real risks.
+        if copied.get("agent") in ("performance", "quality") and _normalize_severity(copied.get("severity")) == "Critical":
+            copied["severity"] = "High"
         if copied.get("line") is None and code_lines:
             copied["line"] = locate_line(copied.get("before_code", ""), code_lines)
             if copied["line"] is None:

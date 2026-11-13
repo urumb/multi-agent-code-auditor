@@ -9,7 +9,7 @@ import pytest
 
 from src.config import Config
 from backend.app.services import db, job_store
-from backend.app.services.audit_runner import _attach_coverage
+from backend.app.services.audit_runner import _annotate_report, ai_failures
 from src.agents.manager import ManagerAgent
 
 
@@ -120,12 +120,12 @@ def test_split_reports_total_chunks_when_capped():
 
 def test_coverage_is_attached_to_report():
     report = json.dumps({"findings": []})
-    out = json.loads(_attach_coverage(report, {"chunks_total": 9, "chunks_analyzed": 6}))
+    out = json.loads(_annotate_report(report, {"chunks_total": 9, "chunks_analyzed": 6}, []))
     assert out["coverage"] == {"chunks_total": 9, "chunks_analyzed": 6}
 
 
 def test_coverage_leaves_unparseable_report_alone():
-    assert _attach_coverage("not json", {"chunks_total": 2, "chunks_analyzed": 2}) == "not json"
+    assert _annotate_report("not json", {"chunks_total": 2, "chunks_analyzed": 2}, []) == "not json"
 
 
 # --- data/ folder migration --------------------------------------------------
@@ -170,3 +170,29 @@ def test_database_folder_is_created(tmp_path, monkeypatch):
     db._initialized = False
     db.init_db()
     assert (tmp_path / "fresh" / "nested" / "audit.db").exists()
+
+
+# --- AI failures are surfaced, not silent --------------------------------------
+
+def test_unreachable_ollama_becomes_a_clear_warning():
+    output = {
+        "security_analysis": [{"snippet_index": 0, "error": "[WinError 10061] connection refused", "findings": []}],
+        "performance_analysis": [{"snippet_index": 0, "findings": []}],
+        "quality_analysis": [
+            {"snippet_index": 0, "error": "model returned 500", "findings": []},
+            {"snippet_index": 1, "findings": []},
+        ],
+    }
+    warnings = ai_failures(output)
+    assert len(warnings) == 2
+    assert "Security Agent" in warnings[0] and "Ollama isn't reachable" in warnings[0]
+    assert "Quality Agent" in warnings[1] and "1 of 2 chunk(s)" in warnings[1] and "model returned 500" in warnings[1]
+
+
+def test_no_warnings_when_agents_succeed():
+    assert ai_failures({"security_analysis": [{"snippet_index": 0, "findings": []}]}) == []
+
+
+def test_warnings_are_stored_in_the_report():
+    out = json.loads(_annotate_report(json.dumps({"findings": []}), {}, ["Security Agent: failed"]))
+    assert out["warnings"] == ["Security Agent: failed"]

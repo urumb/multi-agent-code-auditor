@@ -14,6 +14,8 @@ interface ParsedReport {
     "Findings Summary"?: string;
     top_risk_files?: TopRiskFile[];
     coverage?: { chunks_total: number; chunks_analyzed: number };
+    /** Problems during the audit, e.g. AI agents that couldn't reach Ollama. */
+    warnings?: string[];
     findings?: import("@/lib/findings").RawFinding[];
 }
 
@@ -48,6 +50,14 @@ export function AuditReportView({ file }: { file: FileAuditResult }) {
 
     return (
         <div className="space-y-6">
+            {(data.warnings ?? []).length > 0 && (
+                <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 p-4 text-sm text-amber-400 space-y-1">
+                    <p className="font-semibold">This audit is incomplete</p>
+                    {(data.warnings ?? []).map((w) => (
+                        <p key={w}>{w}</p>
+                    ))}
+                </div>
+            )}
             {coverage && chunksSkipped > 0 && (
                 <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 p-4 text-sm text-amber-400">
                     Partial coverage: this file was too large to analyze fully. Only the {coverage.chunks_analyzed} largest

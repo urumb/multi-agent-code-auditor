@@ -1,16 +1,30 @@
 # Author: urumb
+import os
 import uuid
 from typing import List
 from ..config import Config
 
 class AuditMemory:
     def __init__(self):
-        # Imported lazily: chromadb is slow to import and only needed when
-        # MEMORY_ENABLED=true.
-        import chromadb
+        # Imported lazily: chromadb is optional (requirements-memory.txt),
+        # slow to import, and only needed when MEMORY_ENABLED=true.
+        # ChromaDB sends anonymous usage telemetry by default; this app never
+        # sends data off the machine, so it is switched off both via the env
+        # var (read at import) and the client setting.
+        os.environ.setdefault("ANONYMIZED_TELEMETRY", "False")
+        try:
+            import chromadb
+            from chromadb.config import Settings
+        except ImportError as exc:
+            raise RuntimeError(
+                "MEMORY_ENABLED=true but chromadb isn't installed. "
+                "Run: pip install -r requirements-memory.txt"
+            ) from exc
 
-        # Initialize Chroma Client with persistence
-        self.client = chromadb.PersistentClient(path=Config.CHROMA_PERSIST_DIRECTORY)
+        self.client = chromadb.PersistentClient(
+            path=Config.CHROMA_PERSIST_DIRECTORY,
+            settings=Settings(anonymized_telemetry=False),
+        )
         self.collection = self.client.get_or_create_collection(name="code_audits")
 
     def save_audit(self, code_snippet: str, finding: str, tags: List[str] = None):

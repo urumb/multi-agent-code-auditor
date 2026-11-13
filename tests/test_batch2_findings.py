@@ -174,3 +174,26 @@ def test_static_benchmark_does_not_regress():
     assert totals["precision"] >= 0.90, totals
     clean = [r for r in run(static_only=True, only="clean") if r.name.endswith(".py")]
     assert all(not r.findings for r in clean), [r.findings for r in clean]
+
+
+# --- severity: tools are authoritative outside security ------------------------
+
+def test_tool_severity_wins_for_quality_merges():
+    static = [{"agent": "quality", "line": 1, "source": "ruff", "rule_id": "F401", "severity": "Low",
+               "issue": "unused import", "before_code": "import sqlite3"}]
+    merged = merge_findings([_llm("Unused import", "import sqlite3", agent="quality", severity="Critical")],
+                            static, SQL_CODE)
+    assert len(merged) == 1 and merged[0]["severity"] == "Low" and merged[0]["source"] == "llm+ruff"
+
+
+def test_security_merge_keeps_higher_rating():
+    static = run_static_analysis(SQL_CODE, "a.py")  # bandit B608 is Medium
+    line_code = "query = \"SELECT * FROM users WHERE name = '%s'\" % name"
+    merged = merge_findings([_llm("SQL injection", line_code, severity="Critical")], static, SQL_CODE)
+    assert next(f for f in merged if f["line"] == 4)["severity"] == "Critical"
+
+
+def test_llm_only_non_security_findings_are_capped_at_high():
+    line_code = "return conn.execute(query).fetchall()"
+    merged = merge_findings([_llm("Blocking I/O", line_code, agent="performance", severity="Critical")], [], SQL_CODE)
+    assert merged[0]["severity"] == "High"

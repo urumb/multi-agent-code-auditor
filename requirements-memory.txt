@@ -1,0 +1,9 @@
+# Optional: only needed with MEMORY_ENABLED=true (ChromaDB "memory" of past
+# audits). Not installed by default.
+#
+# Security note: chromadb has open advisories for its *server* mode (HTTP API
+# and auth providers). This project only uses the embedded PersistentClient,
+# never the server, so they don't apply here; there is no fixed release yet.
+# Telemetry is disabled in src/utils/memory.py.
+-r requirements.txt
+chromadb==1.5.9

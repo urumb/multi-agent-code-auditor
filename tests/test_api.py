@@ -137,3 +137,27 @@ def test_settings_lists_and_validates_models(client, monkeypatch):
     assert client.get("/settings/models").json()["models"] == ["llama3.2:latest"]
     assert client.post("/settings", json={"model": "missing"}).status_code == 400
     assert client.post("/settings", json={"model": "llama3.2"}).json()["model"] == "llama3.2"
+
+
+def test_audit_with_failing_ai_reports_warning_instead_of_success(client):
+    class FailingAIGraph:
+        def invoke(self, state):
+            return {**state, "final_report": _report(state["original_code"]),
+                    "execution_plan": {"agents": ["security"]},
+                    "security_analysis": [{"snippet_index": 0, "error": "ConnectError: refused", "findings": []}]}
+
+    original = audit_runner.graph
+    audit_runner.graph = FailingAIGraph()
+    try:
+        code = "q = 1" + chr(10)
+        job_id = client.post("/audit/stream", json={"input_type": "paste", "code": code * 40}).json()["job_id"]
+        events = _events(client, job_id)
+    finally:
+        audit_runner.graph = original
+
+    messages = [e["data"]["message"] for e in events if e["type"] == "log"]
+    assert any("Ollama isn't reachable" in m for m in messages)
+    assert "Pipeline completed with warnings (see above)" in messages
+    assert "Pipeline completed successfully" not in messages
+    result = next(e["data"] for e in events if e["type"] == "result")
+    assert "Ollama isn't reachable" in json.loads(result["final_report"])["warnings"][0]

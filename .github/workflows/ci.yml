@@ -4,19 +4,30 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Weekly run so newly published vulnerabilities in pinned dependencies are
+  # caught even when nothing is being pushed.
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+# Least privilege: CI only needs to read the code.
+permissions:
+  contents: read
 
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# Third-party actions are pinned to exact commits (not movable tags), so a
+# compromised tag upstream can't change what runs here.
 jobs:
   backend:
     name: Backend (lint + tests)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.12"
           cache: pip
@@ -42,9 +53,9 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "22"
           cache: npm
@@ -61,3 +72,31 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  dependency-audit:
+    name: Dependency vulnerability audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+
+      - name: Python dependencies (pip-audit)
+        # Fails on any known vulnerability in the default install. The
+        # optional requirements-memory.txt (chromadb) is not audited here: its
+        # open advisories affect only ChromaDB's server mode, which this
+        # project never runs (see that file).
+        run: |
+          pip install pip-audit
+          pip-audit -r requirements.txt -r requirements-dev.txt
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22"
+
+      - name: Frontend dependencies (npm audit)
+        working-directory: frontend
+        # Production dependencies only; high and critical advisories fail.
+        run: npm audit --omit=dev --audit-level=high

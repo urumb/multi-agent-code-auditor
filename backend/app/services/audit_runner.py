@@ -2,7 +2,7 @@
 import json
 import logging
 import threading
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from src.graph import graph
 
@@ -13,10 +13,38 @@ LogCallback = Optional[Callable[[str, str, str], None]]
 EventCallback = Optional[Callable[[str, Dict[str, Any]], None]]
 
 
-def _attach_coverage(final_report: str, plan: Dict[str, Any]) -> str:
-    """Record how much of the file was actually analyzed in the report, so
-    the UI can say when chunks were skipped instead of implying full coverage."""
-    if "chunks_total" not in plan:
+_AI_AGENTS = (("security", "Security Agent"), ("performance", "Performance Agent"), ("quality", "Quality Agent"))
+_UNREACHABLE_MARKERS = ("10061", "refused", "ConnectError", "Failed to connect", "Name or service not known")
+
+
+def ai_failures(output: Dict[str, Any]) -> List[str]:
+    """Human-readable warnings for AI agents whose LLM calls failed.
+
+    Agents record a failed call per chunk instead of failing the audit, so
+    without this an Ollama outage would silently turn a full audit into a
+    tools-only one that looks complete.
+    """
+    warnings = []
+    for key, label in _AI_AGENTS:
+        results = output.get(f"{key}_analysis") or []
+        errors = [str(r["error"]) for r in results if r.get("error")]
+        if not errors:
+            continue
+        if any(marker in errors[0] for marker in _UNREACHABLE_MARKERS):
+            reason = "Ollama isn't reachable; is it running?"
+        else:
+            reason = errors[0][:160]
+        warnings.append(
+            f"{label}: AI analysis failed for {len(errors)} of {len(results)} chunk(s) ({reason}). "
+            "Only static-analysis findings are shown for it."
+        )
+    return warnings
+
+
+def _annotate_report(final_report: str, plan: Dict[str, Any], warnings: List[str]) -> str:
+    """Record in the report how much was actually analyzed and what failed,
+    so the UI never implies a full AI audit that didn't happen."""
+    if "chunks_total" not in plan and not warnings:
         return final_report
     try:
         report = json.loads(final_report)
@@ -24,10 +52,13 @@ def _attach_coverage(final_report: str, plan: Dict[str, Any]) -> str:
         return final_report
     if not isinstance(report, dict):
         return final_report
-    report["coverage"] = {
-        "chunks_total": plan["chunks_total"],
-        "chunks_analyzed": plan.get("chunks_analyzed", plan["chunks_total"]),
-    }
+    if "chunks_total" in plan:
+        report["coverage"] = {
+            "chunks_total": plan["chunks_total"],
+            "chunks_analyzed": plan.get("chunks_analyzed", plan["chunks_total"]),
+        }
+    if warnings:
+        report["warnings"] = warnings
     return json.dumps(report)
 
 
@@ -95,7 +126,10 @@ def run_audit_on_code(
         output.pop("cancel_event", None)
 
         plan = output.get("execution_plan") or {}
-        output["final_report"] = _attach_coverage(output.get("final_report", ""), plan)
+        warnings = ai_failures(output)
+        output["final_report"] = _annotate_report(output.get("final_report", ""), plan, warnings)
+        for warning in warnings:
+            _log("System", warning, "warning")
         skipped = plan.get("chunks_total", 0) - plan.get("chunks_analyzed", 0)
         if skipped > 0:
             _log(
@@ -108,8 +142,12 @@ def run_audit_on_code(
         planned_agents = plan.get("agents", [])
         if "reviewer" in planned_agents:
             _log("Reviewer Agent", "Synthesizing final report...")
-        _log("System", "Pipeline completed successfully", "success")
-        logger.info("Audit pipeline completed successfully")
+        if warnings:
+            _log("System", "Pipeline completed with warnings (see above)", "warning")
+            logger.warning("Audit pipeline completed with warnings: %s", "; ".join(warnings))
+        else:
+            _log("System", "Pipeline completed successfully", "success")
+            logger.info("Audit pipeline completed successfully")
         return output
     except Exception as exc:
         _log("System", f"Pipeline failed: {exc}", "error")
