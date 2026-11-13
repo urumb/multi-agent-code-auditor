@@ -11,6 +11,7 @@ SQLite (stdlib, no new dependency) is a deliberate, local-first choice
 consistent with the rest of the stack — no external database service.
 """
 import json
+import os
 import sqlite3
 import threading
 from contextlib import contextmanager
@@ -23,6 +24,9 @@ _initialized = False
 
 
 def _connect() -> sqlite3.Connection:
+    # sqlite creates the file but not its folder (e.g. a fresh ./data/).
+    parent = os.path.dirname(os.path.abspath(Config.AUDIT_DB_PATH))
+    os.makedirs(parent, exist_ok=True)
     conn = sqlite3.connect(Config.AUDIT_DB_PATH, timeout=10)
     conn.row_factory = sqlite3.Row
     return conn

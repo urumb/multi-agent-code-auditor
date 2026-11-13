@@ -4,7 +4,6 @@ import logging
 import threading
 from typing import Any, Callable, Dict, Optional
 
-from src.config import Config
 from src.graph import graph
 
 logger = logging.getLogger(__name__)
@@ -65,8 +64,6 @@ def run_audit_on_code(
     Raises:
         RuntimeError: If graph invocation fails.
     """
-    Config.validate()
-
     def _log(agent: str, message: str, level: str = "info") -> None:
         """Emit a log event if a callback is registered."""
         if log_callback:

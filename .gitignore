@@ -8,7 +8,8 @@ env/
 # Environment Variables
 .env
 
-# Local Data & Models
+# Local Data & Models (app data lives in data/)
+data/
 chroma_db/
 chroma/
 *.sqlite3

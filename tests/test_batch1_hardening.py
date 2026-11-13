@@ -126,3 +126,47 @@ def test_coverage_is_attached_to_report():
 
 def test_coverage_leaves_unparseable_report_alone():
     assert _attach_coverage("not json", {"chunks_total": 2, "chunks_analyzed": 2}) == "not json"
+
+
+# --- data/ folder migration --------------------------------------------------
+
+def test_legacy_data_moves_into_data_dir(tmp_path, monkeypatch):
+    for var in ("AUDIT_DB_PATH", "CHROMA_PERSIST_DIRECTORY"):
+        monkeypatch.delenv(var, raising=False)
+    monkeypatch.setattr(Config, "AUDIT_DB_PATH", str(tmp_path / "data" / "audit_history.db"))
+    monkeypatch.setattr(Config, "CHROMA_PERSIST_DIRECTORY", str(tmp_path / "data" / "chroma_db"))
+    (tmp_path / "audit_history.db").write_text("db")
+    (tmp_path / "audit_history.db-wal").write_text("wal")
+    (tmp_path / "chroma_db").mkdir()
+    (tmp_path / "chroma_db" / "x.bin").write_text("v")
+
+    moved = Config.migrate_legacy_data(str(tmp_path))
+
+    assert len(moved) == 3
+    assert (tmp_path / "data" / "audit_history.db").read_text() == "db"
+    assert (tmp_path / "data" / "audit_history.db-wal").exists()
+    assert (tmp_path / "data" / "chroma_db" / "x.bin").exists()
+    assert not (tmp_path / "audit_history.db").exists()
+    assert Config.migrate_legacy_data(str(tmp_path)) == []  # idempotent
+
+
+def test_migration_never_overwrites_or_touches_custom_paths(tmp_path, monkeypatch):
+    monkeypatch.delenv("AUDIT_DB_PATH", raising=False)
+    monkeypatch.setenv("CHROMA_PERSIST_DIRECTORY", str(tmp_path / "custom"))
+    monkeypatch.setattr(Config, "AUDIT_DB_PATH", str(tmp_path / "data" / "audit_history.db"))
+    (tmp_path / "data").mkdir()
+    (tmp_path / "data" / "audit_history.db").write_text("new")
+    (tmp_path / "audit_history.db").write_text("old")
+    (tmp_path / "chroma_db").mkdir()
+
+    assert Config.migrate_legacy_data(str(tmp_path)) == []
+    assert (tmp_path / "data" / "audit_history.db").read_text() == "new"
+    assert (tmp_path / "audit_history.db").read_text() == "old"
+    assert (tmp_path / "chroma_db").exists()
+
+
+def test_database_folder_is_created(tmp_path, monkeypatch):
+    monkeypatch.setattr(Config, "AUDIT_DB_PATH", str(tmp_path / "fresh" / "nested" / "audit.db"))
+    db._initialized = False
+    db.init_db()
+    assert (tmp_path / "fresh" / "nested" / "audit.db").exists()

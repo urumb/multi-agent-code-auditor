@@ -1,0 +1,26 @@
+# Keep the build context small and free of local data and secrets.
+.git
+.github
+.venv
+venv
+env
+**/__pycache__
+**/*.pyc
+.pytest_cache
+.env
+.env.*
+!.env.example
+data
+chroma_db
+local_models
+*.db
+*.db-*
+frontend/node_modules
+frontend/.next
+frontend/out
+frontend/*.tsbuildinfo
+.claude
+.agent
+benchmarks
+tests
+*.log

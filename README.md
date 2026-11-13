@@ -77,7 +77,29 @@ data: {
 
 ---
 
-## ⚙️ Setup
+## 🐳 Quick Start with Docker
+
+The fastest way to run everything (frontend, backend, Ollama and semgrep) is Docker:
+
+```bash
+git clone https://github.com/urumb/multi-agent-code-auditor.git
+cd multi-agent-code-auditor
+docker compose up --build
+```
+
+Open http://localhost:3000. The first start downloads the model (`llama3.2`, ~2 GB) into a Docker volume; later starts are quick. Audit history is kept in the `auditor_data` volume.
+
+- **Security:** ports are published on `127.0.0.1` only, so the unauthenticated backend isn't reachable from your network. Ollama isn't published at all.
+- **Use the Ollama already on your machine** instead of the bundled one (no second model download):
+  ```bash
+  OLLAMA_BASE_URL=http://host.docker.internal:11434 docker compose up --build --no-deps frontend backend
+  ```
+- **Another model:** `MODEL_NAME=qwen2.5-coder:7b docker compose up --build`.
+- **Performance:** Docker Desktop on Windows/macOS runs containers in a VM, so CPU inference is slower than a native Ollama install. On a laptop, the native Ollama option above is usually faster.
+
+---
+
+## ⚙️ Manual Setup
 
 ### 1. Clone Repository
 ```bash
@@ -177,7 +199,7 @@ With a small local model the AI agents add little beyond the tools and introduce
 
 ## 🔐 Privacy & Git Hygiene
 
-- The audit history database (`audit_history.db`), ChromaDB data, local model weights, `.env`, virtualenvs and build output are all listed in `.gitignore`. They contain your code and findings, so never commit them.
+- Everything the app stores lives in `data/` (audit history database, optional ChromaDB memory); set `DATA_DIR` to move it. Data from older versions in the project root is moved there automatically on first start. `data/`, `.env`, virtualenvs and build output are all in `.gitignore`. They contain your code and findings, so never commit them.
 - The backend has no authentication and only allows CORS from `FRONTEND_ORIGINS` (default: `localhost:3000`). Keep it bound to localhost unless you add auth.
 - Private GitHub repositories are not supported (no tokens are ever requested or stored).
 
@@ -208,6 +230,8 @@ Rough timings on a laptop CPU with `llama3.2`: Quick ~20-35s per file, Full ~1-2
 | Audit times out or is slow | Use **Quick** scan depth, a smaller model, or audit fewer files. See *Performance Notes*. |
 | Model not in Settings list | Only installed models are listed. Run `ollama pull <model>`. |
 | UI feels slow | Use `npm run build && npm start` instead of `npm run dev`. |
+| Docker model download fails with `x509: certificate signed by unknown authority` | Your network intercepts HTTPS (common on campus/corporate Wi-Fi), so containers can't verify the download. Pull on another network (`docker compose exec ollama ollama pull llama3.2`), or use the Ollama installed on your machine (see *Quick Start with Docker*). The app still starts without the model. |
+| Docker Desktop crashes with "The file cannot be accessed by the system" on a `.sock` file | A leftover socket from an earlier crash. Quit Docker Desktop, rename the folder named in the error (e.g. `%LOCALAPPDATA%\Docker\run` → `run.old`), and start it again. Don't use *Reset to factory defaults*: it deletes all images and volumes. |
 
 ---
 
@@ -215,6 +239,24 @@ Rough timings on a laptop CPU with `llama3.2`: Quick ~20-35s per file, Full ~1-2
 
 - **Frontend**: Standard Node.js deployment (Vercel, Netlify, Docker).
 - **Backend**: Strongly relies on local LLM capabilities. To maintain complete data privacy, the API server, ChromaDB instance, and Ollama service must all be deployed to a secured environment with adequate local compute (e.g. AWS EC2, bare-metal servers) rather than serverless functions.
+
+---
+
+## 🗂️ Project Layout
+
+```
+backend/app/main.py            FastAPI app: lifespan, CORS, router wiring
+backend/app/routers/           HTTP routes: audit (start + SSE stream), history, settings
+backend/app/services/          audit_jobs (running audits), job_store (live jobs), db (SQLite), input_processor
+src/graph.py                   LangGraph pipeline: manager -> static analysis -> agents -> reviewer
+src/agents/                    Manager, Reviewer, and the Security/Performance/Quality agents (shared base.py)
+src/static_analysis.py         bandit / ruff / semgrep pre-pass
+src/findings.py                finding schema, line anchoring, merging and de-duplication
+rules/semgrep.yml              bundled offline semgrep rules (JS/TS)
+benchmarks/                    labeled sample files + recall/precision scorer
+docker/, docker-compose.yml    container setup
+frontend/                      Next.js UI
+```
 
 ---
 
