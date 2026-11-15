@@ -17,42 +17,47 @@ export default function SettingsPage() {
     const [installedModels, setInstalledModels] = useState<string[]>([]);
     const [ollamaStatus, setOllamaStatus] = useState<"checking" | "ok" | "error">("checking");
 
-    const checkOllamaConnection = async () => {
-        setOllamaStatus("checking");
+    /** Ask the backend whether Ollama is reachable; sets ok/error when done. */
+    const probeOllama = async () => {
         try {
-            // We'll test against the backend health check to confirm backend is up.
-            // In a real app we might have a specific endpoint to test ollama.
             const url = localStorage.getItem("apiUrl") || "http://localhost:8000";
             const response = await fetch(`${url}/settings/ollama`);
-            if (response.ok) {
-                setOllamaStatus("ok");
-            } else {
-                setOllamaStatus("error");
-            }
+            setOllamaStatus(response.ok ? "ok" : "error");
         } catch {
             setOllamaStatus("error");
         }
     };
 
+    /** Re-check on demand (e.g. after saving), showing "checking" meanwhile. */
+    const checkOllamaConnection = () => {
+        setOllamaStatus("checking");
+        void probeOllama();
+    };
+
     useEffect(() => {
-        // Test Ollama connection initially
-        checkOllamaConnection();
+        // Initial check: status already starts as "checking", so only the
+        // async result (in the promise callbacks) updates state.
+        const url = localStorage.getItem("apiUrl") || "http://localhost:8000";
+        fetch(`${url}/settings/ollama`)
+            .then((response) => setOllamaStatus(response.ok ? "ok" : "error"))
+            .catch(() => setOllamaStatus("error"));
     }, []);
 
     useEffect(() => {
-        // Load settings from localStorage
-        const storedApiUrl = localStorage.getItem("apiUrl");
-        if (storedApiUrl && storedApiUrl !== apiUrl) setApiUrl(storedApiUrl);
+        // Load saved settings in a callback after mount (localStorage isn't
+        // available during the server render) rather than synchronously in
+        // the effect body, which would trigger a cascading render.
+        const timer = setTimeout(() => {
+            const storedApiUrl = localStorage.getItem("apiUrl");
+            if (storedApiUrl) setApiUrl(storedApiUrl);
 
-        const storedModel = localStorage.getItem("model");
-        if (storedModel && storedModel !== model) setModel(storedModel);
+            const storedModel = localStorage.getItem("model");
+            if (storedModel) setModel(storedModel);
 
-        const storedAutoRetry = localStorage.getItem("autoRetry");
-        if (storedAutoRetry !== null) {
-            const isRetry = storedAutoRetry === "true";
-            if (isRetry !== autoRetry) setAutoRetry(isRetry);
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+            const storedAutoRetry = localStorage.getItem("autoRetry");
+            if (storedAutoRetry !== null) setAutoRetry(storedAutoRetry === "true");
+        }, 0);
+        return () => clearTimeout(timer);
     }, []);
 
     useEffect(() => {

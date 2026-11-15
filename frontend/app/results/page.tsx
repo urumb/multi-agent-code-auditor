@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useMemo, useState, useSyncExternalStore } from "react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { FileSearch, Play, Download, FileJson, FileText } from "lucide-react";
 import Link from "next/link";
@@ -10,27 +10,40 @@ import { AuditReportView } from "@/components/results/audit-report-view";
 import { SeverityBadge } from "@/components/results/severity-badge";
 import type { Severity } from "@/types";
 
+const RESULT_KEY = "latestAuditResult";
+
+function subscribeToStorage(onChange: () => void): () => void {
+    // Fires when another tab finishes an audit and updates the result.
+    window.addEventListener("storage", onChange);
+    return () => window.removeEventListener("storage", onChange);
+}
+
+function readStoredResult(): string | null {
+    try {
+        return window.localStorage.getItem(RESULT_KEY);
+    } catch {
+        return null; // storage blocked (e.g. privacy mode)
+    }
+}
+
 /**
  * Results page displaying per-file audit reports from the backend.
  * Reads the latest audit result from localStorage (set by useAudit hook).
  */
 export default function ResultsPage() {
-    const [result, setResult] = useState<AuditResultResponse | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [expandedFile, setExpandedFile] = useState<string | null>(null);
-
-    useEffect(() => {
+    // localStorage is an external store: read it with useSyncExternalStore so
+    // the server render (undefined = still loading) and the client agree.
+    const stored = useSyncExternalStore(subscribeToStorage, readStoredResult, () => undefined);
+    const loading = stored === undefined;
+    const result = useMemo<AuditResultResponse | null>(() => {
+        if (!stored) return null;
         try {
-            const stored = localStorage.getItem("latestAuditResult");
-            if (stored) {
-                setResult(JSON.parse(stored) as AuditResultResponse);
-            }
+            return JSON.parse(stored) as AuditResultResponse;
         } catch {
-            // Corrupted localStorage — ignore
-        } finally {
-            setLoading(false);
+            return null; // Corrupted localStorage — ignore
         }
-    }, []);
+    }, [stored]);
+    const [expandedFile, setExpandedFile] = useState<string | null>(null);
 
     const toggleFile = (filePath: string) => {
         setExpandedFile((prev) => (prev === filePath ? null : filePath));

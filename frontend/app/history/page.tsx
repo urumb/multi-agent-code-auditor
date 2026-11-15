@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { History, Play, GitBranch, Clock, ChevronLeft, ChevronRight } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -25,27 +25,32 @@ const STATUS_CLASSES: Record<string, string> = {
  */
 export default function HistoryPage() {
     const [entries, setEntries] = useState<AuditHistoryEntry[]>([]);
-    const [loading, setLoading] = useState(true);
     const [page, setPage] = useState(0);
     const [hasMore, setHasMore] = useState(false);
-
-    const load = useCallback(async (pageIndex: number) => {
-        setLoading(true);
-        try {
-            const data = await fetchAuditHistory(PAGE_SIZE + 1, pageIndex * PAGE_SIZE);
-            setHasMore(data.length > PAGE_SIZE);
-            setEntries(data.slice(0, PAGE_SIZE));
-        } catch {
-            setEntries([]);
-            setHasMore(false);
-        } finally {
-            setLoading(false);
-        }
-    }, []);
+    // Which page the current entries belong to; "loading" is derived from it
+    // rather than set synchronously inside the effect.
+    const [loadedPage, setLoadedPage] = useState<number | null>(null);
+    const loading = loadedPage !== page;
 
     useEffect(() => {
-        load(page);
-    }, [page, load]);
+        let cancelled = false;
+        fetchAuditHistory(PAGE_SIZE + 1, page * PAGE_SIZE)
+            .then((data) => {
+                if (cancelled) return;
+                setHasMore(data.length > PAGE_SIZE);
+                setEntries(data.slice(0, PAGE_SIZE));
+                setLoadedPage(page);
+            })
+            .catch(() => {
+                if (cancelled) return;
+                setEntries([]);
+                setHasMore(false);
+                setLoadedPage(page);
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [page]);
 
     return (
         <div className="space-y-8">

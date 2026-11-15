@@ -333,7 +333,11 @@ export function useAudit(): UseAuditReturn {
         },
         [addLog, _handleSubscription]
     );
-    runAuditRef.current = runAudit;
+    // Keep the ref pointing at the latest runAudit for the auto-retry path
+    // (updated after render, never during it).
+    useEffect(() => {
+        runAuditRef.current = runAudit;
+    }, [runAudit]);
 
     const startAudit = useCallback(
         async (input: AuditInput) => {
