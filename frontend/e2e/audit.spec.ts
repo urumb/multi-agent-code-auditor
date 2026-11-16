@@ -152,6 +152,6 @@ test("history says when the backend is unreachable instead of showing it as empt
     await fakeBasics(page);
     await page.route(`${API}/audit/history?*`, (route) => route.abort("connectionrefused"));
     await page.goto("/history");
-    await expect(page.getByRole("alert")).toContainText("Couldn't load audit history");
+    await expect(page.getByRole("alert").filter({ hasText: "Couldn't load audit history" })).toBeVisible();
     await expect(page.getByText("No audit history yet")).toHaveCount(0);
 });

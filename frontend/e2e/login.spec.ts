@@ -39,10 +39,10 @@ test("wrong password and rate limit show clear messages", async ({ page }) => {
     await page.getByLabel("Username").fill("admin");
     await page.getByLabel("Password").fill("nope");
     await page.getByRole("button", { name: "Sign in" }).click();
-    await expect(page.getByRole("alert")).toHaveText("Wrong username or password.");
+    await expect(page.getByRole("alert").filter({ hasText: "Wrong username" })).toHaveText("Wrong username or password.");
 
     await page.getByRole("button", { name: "Sign in" }).click();
-    await expect(page.getByRole("alert")).toHaveText("Too many attempts. Wait a minute and try again.");
+    await expect(page.getByRole("alert").filter({ hasText: "Too many" })).toHaveText("Too many attempts. Wait a minute and try again.");
     await expect(page).toHaveURL(/\/login$/);
 });
 
