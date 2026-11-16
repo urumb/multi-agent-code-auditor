@@ -1,6 +1,24 @@
 import { expect, test } from "@playwright/test";
 import { API, SQL_FINDING, fakeBasics, json, report, sse } from "./fake-backend";
 
+/** Clicking "Export SARIF" downloads the saved audit's SARIF from the backend. */
+async function expectSarifDownload(page: import("@playwright/test").Page, jobId: string) {
+    let requested = "";
+    await page.route(`${API}/audit/history/${jobId}/sarif`, async (route) => {
+        requested = route.request().url();
+        await route.fulfill({
+            status: 200,
+            contentType: "application/sarif+json",
+            body: JSON.stringify({ version: "2.1.0", runs: [] }),
+        });
+    });
+    const download = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Export SARIF" }).click();
+    expect((await download).suggestedFilename()).toBe(`audit-${jobId.slice(0, 8)}.sarif`);
+    // Always the safe default backend, never an unsafe saved address.
+    expect(requested).toBe(`${API}/audit/history/${jobId}/sarif`);
+}
+
 const CODE = "def get(conn, name):\n    query = \"SELECT * FROM users WHERE name = '%s'\" % name\n";
 
 async function startPasteAudit(page: import("@playwright/test").Page) {
@@ -48,10 +66,7 @@ test("paste audit streams a result that opens on the Results page", async ({ pag
     await page.goto("/results");
     await expect(page.getByText("1 file(s) audited")).toBeVisible();
     await expect(page.getByText("report ready")).toBeVisible();
-    await expect(page.getByRole("link", { name: "Export SARIF" })).toHaveAttribute(
-        "href",
-        `${API}/audit/history/job-1/sarif`
-    );
+    await expectSarifDownload(page, "job-1");
 
     await page.getByText("pasted_input.py").first().click();
     await expect(page.getByText("SQL injection")).toBeVisible();
@@ -142,10 +157,7 @@ test("history shows an incomplete audit's warning", async ({ page }) => {
     await page.getByText("pasted_input.py").first().click();
     await expect(page.getByText("This audit is incomplete")).toBeVisible();
     await expect(page.getByText(warning, { exact: false })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Export SARIF" })).toHaveAttribute(
-        "href",
-        `${API}/audit/history/abc/sarif`
-    );
+    await expectSarifDownload(page, "abc");
 });
 
 test("history says when the backend is unreachable instead of showing it as empty", async ({ page }) => {
@@ -156,7 +168,7 @@ test("history says when the backend is unreachable instead of showing it as empt
     await expect(page.getByText("No audit history yet")).toHaveCount(0);
 });
 
-test("an unsafe saved backend address can't become a javascript: link", async ({ page }) => {
+test("an unsafe saved backend address is never used for requests", async ({ page }) => {
     await fakeBasics(page);
     await page.addInitScript(([stored]) => {
         window.localStorage.setItem("apiUrl", "javascript:alert(document.domain)//");
@@ -168,10 +180,7 @@ test("an unsafe saved backend address can't become a javascript: link", async ({
     })]);
     await page.goto("/results");
     // Falls back to the default backend instead of using the unsafe value.
-    await expect(page.getByRole("link", { name: "Export SARIF" })).toHaveAttribute(
-        "href",
-        `${API}/audit/history/job-9/sarif`
-    );
+    await expectSarifDownload(page, "job-9");
 });
 
 test("settings refuses to save a non-http backend address", async ({ page }) => {

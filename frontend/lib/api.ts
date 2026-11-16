@@ -453,11 +453,6 @@ export async function fetchAuditHistory(limit = 20, offset = 0): Promise<AuditHi
     return apiFetch<AuditHistoryEntry[]>(`/audit/history?limit=${limit}&offset=${offset}`);
 }
 
-/** URL of a saved audit's findings in SARIF format (a file download). */
-export function auditSarifUrl(jobId: string): string {
-    return `${getApiBase()}/audit/history/${encodeURIComponent(jobId)}/sarif`;
-}
-
 export async function fetchAuditHistoryDetail(jobId: string): Promise<AuditHistoryDetail> {
     return apiFetch<AuditHistoryDetail>(`/audit/history/${jobId}`);
 }

@@ -5,11 +5,10 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { FileSearch, Play, Download, FileJson, FileText } from "lucide-react";
 import Link from "next/link";
 import type { AuditResultResponse, FileAuditResult } from "@/lib/api";
-import { exportAuditAsJson, exportAuditAsPdf } from "@/lib/export";
+import { downloadAuditSarif, exportAuditAsJson, exportAuditAsPdf } from "@/lib/export";
 import { AuditReportView } from "@/components/results/audit-report-view";
 import { SeverityBadge } from "@/components/results/severity-badge";
 import { FileStatusBadge } from "@/components/results/file-status-badge";
-import { auditSarifUrl } from "@/lib/api";
 import type { Severity } from "@/types";
 
 const RESULT_KEY = "latestAuditResult";
@@ -152,15 +151,15 @@ export default function ResultsPage() {
                         Export PDF
                     </button>
                     {result.job_id && (
-                        <a
-                            href={auditSarifUrl(result.job_id)}
-                            download
+                        <button
+                            type="button"
+                            onClick={() => result.job_id && downloadAuditSarif(result.job_id)}
                             title="SARIF: the standard format for code-scanning results (GitHub code scanning, VS Code SARIF Viewer)"
                             className="flex items-center gap-2 rounded-md bg-secondary border border-border px-3.5 py-2 text-sm font-medium text-foreground hover:border-[#34363a] transition-colors"
                         >
                             <FileText className="h-4 w-4 text-primary" />
                             Export SARIF
-                        </a>
+                        </button>
                     )}
                 </div>
             </div>

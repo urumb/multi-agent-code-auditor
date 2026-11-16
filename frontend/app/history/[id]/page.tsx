@@ -3,9 +3,9 @@
 import { useEffect, useState, use as usePromise } from "react";
 import Link from "next/link";
 import { ArrowLeft, Download, FileJson, FileText, AlertTriangle } from "lucide-react";
-import { auditSarifUrl, fetchAuditHistoryDetail, type AuditHistoryDetail } from "@/lib/api";
+import { fetchAuditHistoryDetail, type AuditHistoryDetail } from "@/lib/api";
 import { FileStatusBadge } from "@/components/results/file-status-badge";
-import { exportAuditAsJson, exportAuditAsPdf } from "@/lib/export";
+import { downloadAuditSarif, exportAuditAsJson, exportAuditAsPdf } from "@/lib/export";
 import { AuditReportView } from "@/components/results/audit-report-view";
 import { SeverityBadge } from "@/components/results/severity-badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -138,15 +138,15 @@ function HistoryDetailView({ id }: { id: string }) {
                                 <Download className="h-4 w-4 text-primary" />
                                 Export PDF
                             </button>
-                            <a
-                                href={auditSarifUrl(detail.id)}
-                                download
+                            <button
+                                type="button"
+                                onClick={() => downloadAuditSarif(detail.id)}
                                 title="SARIF: the standard format for code-scanning results (GitHub code scanning, VS Code SARIF Viewer)"
                                 className="flex items-center gap-2 rounded-md bg-secondary border border-border px-3.5 py-2 text-sm font-medium text-foreground hover:border-[#34363a] transition-colors"
                             >
                                 <FileText className="h-4 w-4 text-primary" />
                                 Export SARIF
-                            </a>
+                            </button>
                         </div>
                     )}
                 </div>

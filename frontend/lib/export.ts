@@ -1,5 +1,31 @@
 import { toast } from "sonner";
-import type { AuditResultResponse } from "@/lib/api";
+import { authFetch, getApiBase, type AuditResultResponse } from "@/lib/api";
+
+/**
+ * Download a saved audit as SARIF (the standard code-scanning format).
+ *
+ * Fetched, then saved from a local blob, rather than a plain link: the file
+ * goes through the same request path (and login handling) as every other
+ * call, and no link address is built from saved settings.
+ */
+export async function downloadAuditSarif(jobId: string) {
+    try {
+        const response = await authFetch(`${getApiBase()}/audit/history/${encodeURIComponent(jobId)}/sarif`);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `audit-${jobId.slice(0, 8)}.sarif`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        toast.success("SARIF report exported.");
+    } catch {
+        toast.error("Failed to export SARIF report.");
+    }
+}
 
 export function exportAuditAsJson(result: AuditResultResponse, filename = "audit-report.json") {
     try {
