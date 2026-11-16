@@ -1,13 +1,26 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Lock } from "lucide-react";
 import { login } from "@/lib/api";
 
-/** Only allow redirects back into this app (never to another site). */
+/**
+ * Where to go after signing in: only a page on this site, never another one.
+ * The address is resolved exactly as the browser would resolve it, so tricks
+ * like "//evil.com" or "/" + backslash + "evil.com" (browsers treat a
+ * backslash like "/") end up
+ * on another origin and are rejected.
+ */
 function safeNext(raw: string | null): string {
-    if (!raw || !raw.startsWith("/") || raw.startsWith("//") || raw.startsWith("/login")) return "/";
-    return raw;
+    if (!raw) return "/";
+    try {
+        const url = new URL(raw, window.location.origin);
+        if (url.origin !== window.location.origin || url.pathname.startsWith("/login")) return "/";
+        return url.pathname + url.search + url.hash;
+    } catch {
+        return "/";
+    }
 }
 
 /**
@@ -19,6 +32,7 @@ export default function LoginPage() {
     const [password, setPassword] = useState("");
     const [error, setError] = useState<string | null>(null);
     const [submitting, setSubmitting] = useState(false);
+    const router = useRouter();
 
     const handleSubmit = async (event: React.FormEvent) => {
         event.preventDefault();
@@ -31,7 +45,7 @@ export default function LoginPage() {
                 return;
             }
             const next = new URLSearchParams(window.location.search).get("next");
-            window.location.href = safeNext(next);
+            router.replace(safeNext(next));
         } catch {
             setError("Can't reach the server. Try again in a moment.");
         } finally {

@@ -78,14 +78,16 @@ def login(body: LoginRequest, request: Request, response: Response) -> dict:
     ttl = int(Config.SESSION_TTL_HOURS * 3600)
     response.set_cookie(
         SESSION_COOKIE,
-        make_session(body.username, Config.SESSION_SECRET, ttl),
+        # The configured username (equal to body.username at this point),
+        # so nothing from the request is written into the cookie.
+        make_session(Config.AUTH_USERNAME, Config.SESSION_SECRET, ttl),
         max_age=ttl,
         httponly=True,
         secure=Config.COOKIE_SECURE,
         samesite="strict",
         path="/",
     )
-    return {"authenticated": True, "auth_enabled": True, "username": body.username}
+    return {"authenticated": True, "auth_enabled": True, "username": Config.AUTH_USERNAME}
 
 
 @router.post("/auth/logout")

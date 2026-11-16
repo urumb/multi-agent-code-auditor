@@ -57,3 +57,30 @@ test("login never redirects to another site", async ({ page }) => {
 
     await expect(page).toHaveURL("http://localhost:3000/");
 });
+
+for (const next of ["/\evil.example.com/steal", "https://evil.example.com/", "/login?next=/history"]) {
+    test(`login ignores unsafe return address ${JSON.stringify(next)}`, async ({ page }) => {
+        await fakeBasics(page);
+        await page.route(`${API}/auth/login`, (route) => json(route, { authenticated: true }));
+
+        await page.goto(`/login?next=${encodeURIComponent(next)}`);
+        await page.getByLabel("Username").fill("admin");
+        await page.getByLabel("Password").fill("whatever-password");
+        await page.getByRole("button", { name: "Sign in" }).click();
+
+        await expect(page).toHaveURL("http://localhost:3000/");
+    });
+}
+
+test("login keeps a safe return address including its query", async ({ page }) => {
+    await fakeBasics(page);
+    await page.route(`${API}/auth/login`, (route) => json(route, { authenticated: true }));
+    await page.route(`${API}/audit/history?*`, (route) => json(route, []));
+
+    await page.goto(`/login?next=${encodeURIComponent("/history?page=2")}`);
+    await page.getByLabel("Username").fill("admin");
+    await page.getByLabel("Password").fill("whatever-password");
+    await page.getByRole("button", { name: "Sign in" }).click();
+
+    await expect(page).toHaveURL("http://localhost:3000/history?page=2");
+});

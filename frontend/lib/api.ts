@@ -7,19 +7,37 @@
 
 import type { AuditInput, MetricData, TrendPoint, RecentAudit } from "@/types";
 
-const DEFAULT_API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+/**
+ * Returns ``value`` as a usable backend base URL, or null if it isn't one.
+ * Only http(s) URLs and same-site paths ("/api") are accepted: the base ends
+ * up in fetch() calls and link hrefs, where a value like "javascript:..."
+ * would run code when the link is clicked.
+ */
+export function sanitizeApiBase(value: string | null | undefined): string | null {
+    const trimmed = (value ?? "").trim().replace(/\/+$/, "");
+    if (!trimmed) return null;
+    if (trimmed.startsWith("/") && !trimmed.startsWith("//") && !trimmed.includes("\\")) return trimmed;
+    try {
+        const url = new URL(trimmed);
+        if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+        return url.origin + url.pathname.replace(/\/+$/, "");
+    } catch {
+        return null;
+    }
+}
+
+const DEFAULT_API_BASE = sanitizeApiBase(process.env.NEXT_PUBLIC_API_URL) ?? "http://localhost:8000";
 
 /**
  * Resolves the backend API base URL, preferring a user override saved from
  * the Settings page (localStorage "apiUrl") over the build-time env default.
  * Read at call time (not module load) so a Settings change takes effect
- * immediately without a page reload.
+ * immediately without a page reload. Invalid values fall back to the default.
  */
 export function getApiBase(): string {
     if (typeof window === "undefined") return DEFAULT_API_BASE;
     try {
-        const stored = window.localStorage.getItem("apiUrl");
-        return stored && stored.trim().length > 0 ? stored.trim().replace(/\/+$/, "") : DEFAULT_API_BASE;
+        return sanitizeApiBase(window.localStorage.getItem("apiUrl")) ?? DEFAULT_API_BASE;
     } catch {
         return DEFAULT_API_BASE;
     }

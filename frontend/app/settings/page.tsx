@@ -2,7 +2,15 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { authFetch, fetchAuthStatus, fetchInstalledModels, logout, type AuthStatus } from "@/lib/api";
+import {
+    authFetch,
+    fetchAuthStatus,
+    fetchInstalledModels,
+    getApiBase,
+    logout,
+    sanitizeApiBase,
+    type AuthStatus,
+} from "@/lib/api";
 import { Save, Server, Palette, RotateCcw, Brain } from "lucide-react";
 import { toast } from "sonner";
 
@@ -29,8 +37,7 @@ export default function SettingsPage() {
     /** Ask the backend whether Ollama is reachable; sets ok/error when done. */
     const probeOllama = async () => {
         try {
-            const url = localStorage.getItem("apiUrl") || "http://localhost:8000";
-            const response = await authFetch(`${url}/settings/ollama`);
+            const response = await authFetch(`${getApiBase()}/settings/ollama`);
             setOllamaStatus(response.ok ? "ok" : "error");
         } catch {
             setOllamaStatus("error");
@@ -46,8 +53,7 @@ export default function SettingsPage() {
     useEffect(() => {
         // Initial check: status already starts as "checking", so only the
         // async result (in the promise callbacks) updates state.
-        const url = localStorage.getItem("apiUrl") || "http://localhost:8000";
-        authFetch(`${url}/settings/ollama`)
+        authFetch(`${getApiBase()}/settings/ollama`)
             .then((response) => setOllamaStatus(response.ok ? "ok" : "error"))
             .catch(() => setOllamaStatus("error"));
     }, []);
@@ -80,13 +86,18 @@ export default function SettingsPage() {
     }, []);
 
     const handleSave = async () => {
-        localStorage.setItem("apiUrl", apiUrl);
+        const base = sanitizeApiBase(apiUrl);
+        if (!base) {
+            toast.error("The backend URL must start with http:// or https://");
+            return;
+        }
+        localStorage.setItem("apiUrl", base);
         localStorage.setItem("model", model);
         localStorage.setItem("autoRetry", String(autoRetry));
 
         try {
             // Post settings to backend
-            const res = await authFetch(`${apiUrl}/settings`, {
+            const res = await authFetch(`${base}/settings`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ model })

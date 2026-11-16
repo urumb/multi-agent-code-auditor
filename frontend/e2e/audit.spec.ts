@@ -155,3 +155,31 @@ test("history says when the backend is unreachable instead of showing it as empt
     await expect(page.getByRole("alert").filter({ hasText: "Couldn't load audit history" })).toBeVisible();
     await expect(page.getByText("No audit history yet")).toHaveCount(0);
 });
+
+test("an unsafe saved backend address can't become a javascript: link", async ({ page }) => {
+    await fakeBasics(page);
+    await page.addInitScript(([stored]) => {
+        window.localStorage.setItem("apiUrl", "javascript:alert(document.domain)//");
+        window.localStorage.setItem("latestAuditResult", stored);
+    }, [JSON.stringify({
+        job_id: "job-9",
+        total_files: 1,
+        results: [{ file_path: "x.py", final_report: report([]), risk_score: 0, max_severity: "Low", error: null }],
+    })]);
+    await page.goto("/results");
+    // Falls back to the default backend instead of using the unsafe value.
+    await expect(page.getByRole("link", { name: "Export SARIF" })).toHaveAttribute(
+        "href",
+        `${API}/audit/history/job-9/sarif`
+    );
+});
+
+test("settings refuses to save a non-http backend address", async ({ page }) => {
+    await fakeBasics(page);
+    await page.route(`${API}/settings/**`, (route) => json(route, {}, 503));
+    await page.goto("/settings");
+    await page.getByLabel("Backend API URL").fill("javascript:alert(1)");
+    await page.getByRole("button", { name: "Save Settings" }).click();
+    await expect(page.getByText("The backend URL must start with http:// or https://")).toBeVisible();
+    expect(await page.evaluate(() => window.localStorage.getItem("apiUrl"))).toBeNull();
+});
