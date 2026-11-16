@@ -19,7 +19,7 @@ from backend.app.services.input_processor import (
     process_pasted_code,
     process_uploaded_files,
 )
-from backend.app.services.job_store import create_job, get_job
+from backend.app.services.job_store import create_job, get_job, request_cancel
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["audit"])
@@ -77,6 +77,18 @@ async def audit_stream_subscribe(job_id: str) -> StreamingResponse:
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+@router.post("/audit/stream/{job_id}/cancel")
+def audit_stream_cancel(job_id: str) -> dict:
+    """Stop a running audit. Files already audited are kept; the job
+    finishes with status "cancelled" and a "cancelled" stream event."""
+    outcome = request_cancel(job_id)
+    if outcome == "not_found":
+        raise HTTPException(status_code=404, detail="Job not found")
+    if outcome == "finished":
+        raise HTTPException(status_code=409, detail="Job has already finished")
+    return {"status": "cancelling"}
 
 
 def _resolve_code_files(request: AuditRequest) -> List[CodeFile]:

@@ -17,6 +17,7 @@ const STATUS_CLASSES: Record<string, string> = {
     failed: "bg-red-500/10 text-red-400 border-red-500/20",
     running: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20",
     pending: "bg-muted text-muted-foreground border-transparent",
+    cancelled: "bg-muted text-muted-foreground border-border",
 };
 
 /**

@@ -18,6 +18,7 @@ const statusConfig: Record<AuditStatus, { label: string; classes: string; dotCol
     running: { label: "Running", classes: "bg-primary/10 text-primary border-primary/20", dotColor: "bg-primary", pulsing: true },
     completed: { label: "Completed", classes: "bg-primary/10 text-primary border-primary/20", dotColor: "bg-primary", pulsing: false },
     failed: { label: "Failed", classes: "bg-red-500/10 text-red-400 border-red-500/20", dotColor: "bg-red-500", pulsing: false },
+    cancelled: { label: "Cancelled", classes: "bg-muted text-muted-foreground border-border", dotColor: "bg-muted-foreground", pulsing: false },
 };
 
 /**

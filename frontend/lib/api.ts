@@ -42,6 +42,8 @@ export interface FileAuditResult {
 export interface AuditResultResponse {
     /** Set for streamed audits; used to download the saved audit as SARIF. */
     job_id?: string;
+    /** True when the user cancelled: results hold only the files that finished. */
+    cancelled?: boolean;
     total_files: number;
     /** Files left out because the input exceeded MAX_FILES_PER_AUDIT. */
     files_skipped?: number;
@@ -107,6 +109,7 @@ export interface StreamCallbacks {
     onAgentCompleted: (data: AgentLifecycleEvent) => void;
     onAgentFailed: (data: AgentLifecycleEvent) => void;
     onDone: (data: { total_files: number; files_skipped?: number; duration?: number }) => void;
+    onCancelled: (data: { files_done: number; total_files: number; duration?: number }) => void;
     onError: (error: string) => void;
 }
 
@@ -159,6 +162,17 @@ async function syncSelectedModel(): Promise<void> {
 
 export async function fetchInstalledModels(): Promise<{ models: string[]; current: string }> {
     return apiFetch<{ models: string[]; current: string }>("/settings/models");
+}
+
+/** Ask the backend to stop a running audit (files already done are kept). */
+export async function cancelAuditJob(jobId: string): Promise<void> {
+    const response = await fetch(`${getApiBase()}/audit/stream/${encodeURIComponent(jobId)}/cancel`, {
+        method: "POST",
+    });
+    // 409 = it finished just before the click; nothing left to cancel.
+    if (!response.ok && response.status !== 409) {
+        throw new Error(`Cancel failed (HTTP ${response.status})`);
+    }
 }
 
 export async function startAuditJob(input: AuditInput): Promise<{ job_id: string }> {
@@ -290,6 +304,9 @@ export async function subscribeToAuditJob(
                             break;
                         case "done":
                             callbacks.onDone(event.data as { total_files: number; files_skipped?: number; duration?: number });
+                            break;
+                        case "cancelled":
+                            callbacks.onCancelled(event.data as { files_done: number; total_files: number; duration?: number });
                             break;
                         case "error":
                             callbacks.onError((event.data as { message: string }).message);

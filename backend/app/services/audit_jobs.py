@@ -18,7 +18,7 @@ from backend.app.schemas.code_file import AuditResultResponse, CodeFile, FileAud
 from backend.app.services import db
 from backend.app.services.audit_runner import run_audit_on_code
 from backend.app.services.input_processor import process_github_repo
-from backend.app.services.job_store import add_job_event, finalize_job, get_job
+from backend.app.services.job_store import FINISHED_STATUSES, add_job_event, finalize_job, get_job
 from backend.app.services.result_cache import cache_key
 from src.config import Config
 
@@ -137,14 +137,27 @@ def cap_file_count(code_files: List[CodeFile], job_id: Optional[str] = None) -> 
 # ---------------------------------------------------------------------------
 # Background jobs
 # ---------------------------------------------------------------------------
+class JobCancelled(Exception):
+    """The user cancelled the job while a file was being audited."""
+
+
+_CANCEL_POLL_SECONDS = 0.5
+
+
 def _log(job_id: str, message: str, level: str = "info") -> None:
     add_job_event(job_id, "log", {"agent": "System", "message": message, "level": level})
 
 
 def _audit_file_with_timeout(
-    job_id: str, file: CodeFile, total: int, depth: str, use_cache: bool = True
+    job_id: str,
+    file: CodeFile,
+    total: int,
+    depth: str,
+    use_cache: bool = True,
+    job_cancel: Optional[threading.Event] = None,
 ) -> Dict[str, Any]:
-    """Audit one file inside a job, giving up after PER_FILE_TIMEOUT_SECONDS."""
+    """Audit one file inside a job, giving up after PER_FILE_TIMEOUT_SECONDS
+    or as soon as the user cancels the job (raises JobCancelled)."""
     # Once set, this both cancels the file's remaining LLM calls (so it
     # releases the shared LLM slot instead of starving the next file) and
     # suppresses further events from it — a slow thread finishing after we
@@ -170,11 +183,19 @@ def _audit_file_with_timeout(
         cancel_event=abandoned, log_callback=log_callback, event_callback=event_callback,
         use_cache=use_cache,
     )
+    deadline = time.monotonic() + Config.PER_FILE_TIMEOUT_SECONDS
     try:
-        return future.result(timeout=Config.PER_FILE_TIMEOUT_SECONDS)
-    except concurrent.futures.TimeoutError:
-        abandoned.set()
-        raise
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                abandoned.set()
+                raise concurrent.futures.TimeoutError()
+            try:
+                return future.result(timeout=min(_CANCEL_POLL_SECONDS, remaining))
+            except concurrent.futures.TimeoutError:
+                if job_cancel is not None and job_cancel.is_set():
+                    abandoned.set()  # stops its remaining LLM calls too
+                    raise JobCancelled() from None
     finally:
         executor.shutdown(wait=False)
 
@@ -193,17 +214,25 @@ def run_audit_job(
     results: List[Dict[str, Any]] = []
     start_time = time.time()
     total = len(code_files)
+    cancel = job.get("cancel_event")
+    cancelled = False
 
     try:
         _log(job_id, f"Starting background audit — {total} file(s) queued")
 
         for i, file in enumerate(code_files, start=1):
+            if cancel is not None and cancel.is_set():
+                cancelled = True
+                break
             add_job_event(job_id, "file_start", {"path": file.path, "index": i, "total": total})
             _log(job_id, f"[{i}/{total}] Processing: {file.path}")
 
             try:
-                result = _audit_file_with_timeout(job_id, file, total, depth, use_cache)
+                result = _audit_file_with_timeout(job_id, file, total, depth, use_cache, cancel)
                 add_job_event(job_id, "risk_update", {"file_path": file.path, "risk_score": result["risk_score"]})
+            except JobCancelled:
+                cancelled = True
+                break
             except concurrent.futures.TimeoutError:
                 result = file_result(file.path, error=f"Timed out after {Config.PER_FILE_TIMEOUT_SECONDS:g} seconds")
             except Exception as exc:
@@ -216,6 +245,15 @@ def run_audit_job(
             add_job_event(job_id, "file_done", {"path": file.path, "index": i, "total": total})
 
         duration = round(time.time() - start_time, 2)
+        if cancelled:
+            _log(job_id, f"Audit cancelled after {len(results)} of {total} file(s)", "warning")
+            add_job_event(job_id, "cancelled", {
+                "files_done": len(results), "total_files": total, "duration": duration,
+            })
+            job["status"] = "cancelled"
+            finalize_job(job_id, "cancelled", results=results, duration=duration)
+            return
+
         add_job_event(job_id, "done", {
             "total_files": len(results),
             "files_skipped": job.get("files_skipped", 0),
@@ -260,6 +298,8 @@ def run_github_audit_job(
         return
 
     _log(job_id, f"Cloned repository — {len(code_files)} auditable file(s) found", "success")
+    # run_audit_job checks the cancel flag before the first file, so a
+    # cancel requested during the clone takes effect here.
     run_audit_job(job_id, code_files, depth, use_cache)
 
 
@@ -282,7 +322,7 @@ async def stream_job_events(job_id: str):
             sent = True
         idle_ticks = 0 if sent else idle_ticks + 1
 
-        if job["status"] in ("completed", "failed"):
+        if job["status"] in FINISHED_STATUSES:
             while last_index < len(job["events"]):
                 yield f"data: {json.dumps(job['events'][last_index])}\n\n"
                 last_index += 1

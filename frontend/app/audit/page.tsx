@@ -30,6 +30,7 @@ export default function AuditPage() {
         duration,
         agentGraphStates,
         startAudit,
+        cancelAudit,
         reset,
     } = useAudit();
     const prevStatusRef = useRef(status);
@@ -44,6 +45,9 @@ export default function AuditPage() {
             toast.error("Audit failed", {
                 icon: <XCircle className="h-4 w-4 text-red-400" />,
             });
+        }
+        if (prevStatusRef.current === "running" && status === "cancelled") {
+            toast.info("Audit cancelled. Files that finished are kept.");
         }
         prevStatusRef.current = status;
     }, [status]);
@@ -68,7 +72,16 @@ export default function AuditPage() {
                 </div>
                 {status !== "idle" && (
                     <div className="flex gap-2">
-                        {status === "completed" && result && (
+                        {status === "running" && (
+                            <button
+                                type="button"
+                                onClick={() => void cancelAudit()}
+                                className="rounded-full border border-red-500/30 px-4 py-2 text-[0.8125rem] font-medium text-red-400 transition-colors duration-300 hover:border-red-500/60 hover:bg-red-500/10"
+                            >
+                                Cancel audit
+                            </button>
+                        )}
+                        {(status === "completed" || status === "cancelled") && result && (
                             <button
                                 type="button"
                                 onClick={() => exportAuditAsJson(result, "audit_report.json")}

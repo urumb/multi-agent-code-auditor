@@ -34,7 +34,8 @@ JOB_TTL_SECONDS = 30 * 60
 # Hard cap on jobs kept in memory; the oldest *finished* jobs are evicted
 # first, so a burst of audits can't grow memory without bound.
 MAX_LIVE_JOBS = 100
-_FINISHED = ("completed", "failed")
+FINISHED_STATUSES = ("completed", "failed", "cancelled")
+_FINISHED = FINISHED_STATUSES
 
 
 def create_job(input_identifier: str = "Unknown Input", input_type: str = "unknown") -> str:
@@ -52,6 +53,9 @@ def create_job(input_identifier: str = "Unknown Input", input_type: str = "unkno
         "input_type": input_type,
         "total_findings": 0,
         "files_skipped": 0,
+        # Set by POST /audit/stream/{id}/cancel; the job stops at the next file
+        # (or abandons the current one) and finishes as "cancelled".
+        "cancel_event": threading.Event(),
     }
     with _lock:
         jobs[job_id] = job
@@ -155,3 +159,14 @@ def cleanup_old_jobs():
             )
             for k in finished[:overflow]:
                 del jobs[k]
+
+
+def request_cancel(job_id: str) -> str:
+    """Ask a live job to stop. Returns "cancelling", "finished" or "not_found"."""
+    job = jobs.get(job_id)
+    if not job:
+        return "not_found"
+    if job["status"] in FINISHED_STATUSES:
+        return "finished"
+    job["cancel_event"].set()
+    return "cancelling"

@@ -3,7 +3,7 @@
  */
 
 /** Possible statuses for an audit run. */
-export type AuditStatus = "idle" | "pending" | "running" | "completed" | "failed";
+export type AuditStatus = "idle" | "pending" | "running" | "completed" | "failed" | "cancelled";
 
 /** Severity levels for findings — mirrors the backend's 4-level scale. */
 export type Severity = "critical" | "high" | "medium" | "low";

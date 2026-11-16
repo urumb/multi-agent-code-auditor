@@ -121,9 +121,15 @@ export default function ResultsPage() {
                         <p className="text-sm text-muted-foreground">
                             {result.total_files} file(s) audited
                         </p>
-                        <span className="inline-flex items-center gap-1.5 rounded-full border bg-primary/10 text-primary border-primary/20 px-2.5 py-0.5 text-xs font-medium">
-                            completed
-                        </span>
+                        {result.cancelled ? (
+                            <span className="inline-flex items-center gap-1.5 rounded-full border bg-muted text-muted-foreground border-border px-2.5 py-0.5 text-xs font-medium">
+                                cancelled
+                            </span>
+                        ) : (
+                            <span className="inline-flex items-center gap-1.5 rounded-full border bg-primary/10 text-primary border-primary/20 px-2.5 py-0.5 text-xs font-medium">
+                                completed
+                            </span>
+                        )}
                     </div>
                 </div>
 
@@ -158,6 +164,12 @@ export default function ResultsPage() {
                     )}
                 </div>
             </div>
+
+            {result.cancelled && (
+                <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 p-4 text-sm text-amber-400">
+                    This audit was cancelled. Only the files that finished before cancelling are shown.
+                </div>
+            )}
 
             {(result.files_skipped ?? 0) > 0 && (
                 <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 p-4 text-sm text-amber-400">

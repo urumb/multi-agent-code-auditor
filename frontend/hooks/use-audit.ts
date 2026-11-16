@@ -8,6 +8,7 @@ import type {
     AuditStage,
 } from "@/types";
 import {
+    cancelAuditJob,
     startAuditJob,
     startUploadJob,
     subscribeToAuditJob,
@@ -104,6 +105,7 @@ interface UseAuditReturn {
     duration: number | null;
     agentGraphStates: Record<string, AgentGraphNodeState>;
     startAudit: (input: AuditInput) => Promise<void>;
+    cancelAudit: () => Promise<void>;
     reset: () => void;
 }
 
@@ -250,6 +252,26 @@ export function useAudit(): UseAuditReturn {
 
                     addLog("System", `✓ Audit complete — ${data.total_files} file(s) processed in ${data.duration ? data.duration + 's' : 'unknown time'}`, "success");
                 },
+                onCancelled: (data: { files_done: number; total_files: number; duration?: number }) => {
+                    const partial: AuditResultResponse = {
+                        job_id: jobId,
+                        total_files: data.files_done,
+                        cancelled: true,
+                        results: resultsRef.current,
+                    };
+                    setResult(partial);
+                    setStatus("cancelled");
+                    setCurrentFile(null);
+                    setCurrentAgent(null);
+                    setDuration(data.duration ?? null);
+                    localStorage.setItem("latestAuditResult", JSON.stringify(partial));
+                    localStorage.removeItem(JOB_STORAGE_KEY);
+                    addLog(
+                        "System",
+                        `Audit cancelled after ${data.files_done} of ${data.total_files} file(s). Finished files are kept.`,
+                        "warning"
+                    );
+                },
                 onError: (errorMsg: string) => {
                     if (errorMsg.includes("Job not found")) {
                         localStorage.removeItem(JOB_STORAGE_KEY);
@@ -349,6 +371,17 @@ export function useAudit(): UseAuditReturn {
         [runAudit]
     );
 
+    const cancelAudit = useCallback(async () => {
+        const jobId = localStorage.getItem(JOB_STORAGE_KEY);
+        if (!jobId) return;
+        addLog("System", "Cancelling: stopping after the current step...", "warning");
+        try {
+            await cancelAuditJob(jobId);
+        } catch (err) {
+            addLog("System", err instanceof Error ? err.message : "Cancel failed", "error");
+        }
+    }, [addLog]);
+
     const reset = useCallback(() => {
         setStatus("idle");
         setStages([]);
@@ -374,6 +407,7 @@ export function useAudit(): UseAuditReturn {
         duration,
         agentGraphStates,
         startAudit,
+        cancelAudit,
         reset,
     };
 }

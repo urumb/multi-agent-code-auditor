@@ -72,3 +72,8 @@ audit_report*.json
 audit-report*.json
 audit-report*.pdf
 nohup.out
+
+# Playwright output
+frontend/test-results/
+frontend/playwright-report/
+frontend/blob-report/

@@ -145,3 +145,40 @@ def test_cache_can_be_bypassed(monkeypatch):
     monkeypatch.setattr(Config, "CACHE_ENABLED", False)
     audit_jobs.audit_file(file, 1, "quick")
     assert graph.calls == 3
+
+
+# --- cancel ---------------------------------------------------------------------
+
+def test_cancel_stops_job_and_keeps_finished_files(monkeypatch):
+    import threading
+    import time as _time
+
+    from backend.app.services import job_store
+
+    class SlowGraph:
+        def invoke(self, state):
+            _time.sleep(0.6)
+            return {**state, "final_report": json.dumps({"findings": []}),
+                    "execution_plan": {"agents": ["security"]}}
+
+    monkeypatch.setattr(audit_runner, "graph", SlowGraph())
+    files = [CodeFile(path=f"f{i}.py", content=f"v = {i}\n" * 20) for i in range(5)]
+    job_id = job_store.create_job("t", "paste")
+    worker = threading.Thread(target=audit_jobs.run_audit_job, args=(job_id, files, "quick", False))
+    worker.start()
+
+    job = job_store.get_job(job_id)
+    deadline = _time.time() + 10
+    while sum(e["type"] == "result" for e in job["events"]) < 1 and _time.time() < deadline:
+        _time.sleep(0.05)
+    assert job_store.request_cancel(job_id) == "cancelling"
+    worker.join(timeout=10)
+
+    assert job["status"] == "cancelled"
+    cancelled = [e for e in job["events"] if e["type"] == "cancelled"]
+    assert len(cancelled) == 1 and 1 <= cancelled[0]["data"]["files_done"] < 5
+    assert not any(e["type"] == "done" for e in job["events"])
+    detail = db.get_job_detail(job_id)
+    assert detail["status"] == "cancelled" and len(detail["results"]) == cancelled[0]["data"]["files_done"]
+    assert job_store.request_cancel(job_id) == "finished"
+    assert job_store.request_cancel("nope") == "not_found"

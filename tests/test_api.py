@@ -190,3 +190,10 @@ def test_second_audit_of_unchanged_code_is_marked_cached(client):
     third = next(e["data"] for e in _events(client, client.post("/audit/stream", json=no_cache).json()["job_id"])
                  if e["type"] == "result")
     assert third["cached"] is False
+
+
+def test_cancel_endpoint_status_codes(client):
+    assert client.post("/audit/stream/nope/cancel").status_code == 404
+    job_id = client.post("/audit/stream", json={"input_type": "paste", "code": "c = 1\n" * 30}).json()["job_id"]
+    _events(client, job_id)  # already finished
+    assert client.post(f"/audit/stream/{job_id}/cancel").status_code == 409
