@@ -160,7 +160,27 @@ def build_parser() -> argparse.ArgumentParser:
     scan.add_argument("--no-cache", action="store_true",
                       help="re-audit every file even if it hasn't changed since the last audit")
     scan.add_argument("-q", "--quiet", action="store_true", help="don't print progress")
+
+    sub.add_parser("hash-password", help="hash a login password for AUTH_PASSWORD_HASH (deployment)")
+    sub.add_parser("new-secret", help="generate a random SESSION_SECRET (deployment)")
     return parser
+
+
+def _hash_password() -> int:
+    import getpass
+
+    from backend.app.security import hash_password
+
+    password = getpass.getpass("New password: ")
+    if len(password) < 12:
+        print("error: use at least 12 characters", file=sys.stderr)
+        return EXIT_ERROR
+    if getpass.getpass("Repeat password: ") != password:
+        print("error: passwords don't match", file=sys.stderr)
+        return EXIT_ERROR
+    print(hash_password(password))
+    print("Put this in AUTH_PASSWORD_HASH (in .env). The password itself is not stored.", file=sys.stderr)
+    return EXIT_OK
 
 
 def main(argv: Optional[List[str]] = None) -> int:
@@ -169,6 +189,13 @@ def main(argv: Optional[List[str]] = None) -> int:
     logging.basicConfig(level=logging.WARNING, stream=sys.stderr, format="%(levelname)s %(name)s: %(message)s")
     if args.command == "scan":
         return _scan(args)
+    if args.command == "hash-password":
+        return _hash_password()
+    if args.command == "new-secret":
+        import secrets
+
+        print(secrets.token_urlsafe(48))
+        return EXIT_OK
     return EXIT_ERROR
 
 

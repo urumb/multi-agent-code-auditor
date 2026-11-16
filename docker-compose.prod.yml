@@ -1,0 +1,91 @@
+# Production stack for a server: HTTPS, login required, nothing exposed
+# except Caddy on ports 80/443. See README "Deployment" for setup.
+#
+#   cp .env.example .env    # then fill in DOMAIN, AUTH_*, SESSION_SECRET
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# Everything here is free: Caddy and Let's Encrypt certificates, Ollama and
+# the models, and the app itself.
+
+services:
+  caddy:
+    image: caddy:2.11.7
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAIN: ${DOMAIN:?Set DOMAIN in .env (e.g. auditor.example.com)}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - frontend
+      - backend
+    restart: unless-stopped
+
+  ollama:
+    image: ollama/ollama:0.40.13
+    volumes:
+      - ollama_models:/root/.ollama
+    restart: unless-stopped
+
+  ollama-pull:
+    image: ollama/ollama:0.40.13
+    depends_on:
+      - ollama
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    entrypoint:
+      - /bin/sh
+      - -c
+      - >-
+        until ollama list >/dev/null 2>&1; do sleep 1; done;
+        ollama pull ${MODEL_NAME:-qwen2.5-coder:3b}
+        || echo "WARNING: could not download ${MODEL_NAME:-qwen2.5-coder:3b}"
+    restart: "no"
+
+  backend:
+    build:
+      context: .
+      dockerfile: docker/backend.Dockerfile
+    # --proxy-headers: rate limits see the real client address from Caddy.
+    # Safe to trust: the backend isn't published, so only Caddy can reach it.
+    command:
+      ["uvicorn", "backend.app.main:app", "--host", "0.0.0.0", "--port", "8000",
+       "--proxy-headers", "--forwarded-allow-ips", "*"]
+    environment:
+      AUTH_ENABLED: "true"
+      AUTH_USERNAME: ${AUTH_USERNAME:?Set AUTH_USERNAME in .env}
+      AUTH_PASSWORD_HASH: ${AUTH_PASSWORD_HASH:?Set AUTH_PASSWORD_HASH in .env (python main.py hash-password)}
+      SESSION_SECRET: ${SESSION_SECRET:?Set SESSION_SECRET in .env (python main.py new-secret)}
+      COOKIE_SECURE: "true"
+      FRONTEND_ORIGINS: https://${DOMAIN}
+      OLLAMA_BASE_URL: http://ollama:11434
+      MODEL_NAME: ${MODEL_NAME:-qwen2.5-coder:3b}
+      MAX_FILES_PER_AUDIT: ${MAX_FILES_PER_AUDIT:-25}
+      MAX_CONCURRENT_AUDITS: ${MAX_CONCURRENT_AUDITS:-2}
+    volumes:
+      - auditor_data:/data
+    depends_on:
+      ollama-pull:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/frontend.Dockerfile
+      args:
+        # Same address as the UI; Caddy routes /api to the backend.
+        NEXT_PUBLIC_API_URL: /api
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  ollama_models:
+  auditor_data:
+  caddy_data:
+  caddy_config:

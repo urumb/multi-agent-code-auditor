@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { fetchInstalledModels } from "@/lib/api";
+import { useRouter } from "next/navigation";
+import { authFetch, fetchAuthStatus, fetchInstalledModels, logout, type AuthStatus } from "@/lib/api";
 import { Save, Server, Palette, RotateCcw, Brain } from "lucide-react";
 import { toast } from "sonner";
 
@@ -12,16 +13,24 @@ import { useEffect } from "react";
 
 export default function SettingsPage() {
     const [apiUrl, setApiUrl] = useState("http://localhost:8000");
-    const [model, setModel] = useState("llama3.2");
+    const [model, setModel] = useState("qwen2.5-coder:3b");
     const [autoRetry, setAutoRetry] = useState(true);
     const [installedModels, setInstalledModels] = useState<string[]>([]);
     const [ollamaStatus, setOllamaStatus] = useState<"checking" | "ok" | "error">("checking");
+    const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null);
+    const router = useRouter();
+
+    useEffect(() => {
+        fetchAuthStatus()
+            .then(setAuthStatus)
+            .catch(() => setAuthStatus(null));
+    }, []);
 
     /** Ask the backend whether Ollama is reachable; sets ok/error when done. */
     const probeOllama = async () => {
         try {
             const url = localStorage.getItem("apiUrl") || "http://localhost:8000";
-            const response = await fetch(`${url}/settings/ollama`);
+            const response = await authFetch(`${url}/settings/ollama`);
             setOllamaStatus(response.ok ? "ok" : "error");
         } catch {
             setOllamaStatus("error");
@@ -38,7 +47,7 @@ export default function SettingsPage() {
         // Initial check: status already starts as "checking", so only the
         // async result (in the promise callbacks) updates state.
         const url = localStorage.getItem("apiUrl") || "http://localhost:8000";
-        fetch(`${url}/settings/ollama`)
+        authFetch(`${url}/settings/ollama`)
             .then((response) => setOllamaStatus(response.ok ? "ok" : "error"))
             .catch(() => setOllamaStatus("error"));
     }, []);
@@ -77,7 +86,7 @@ export default function SettingsPage() {
 
         try {
             // Post settings to backend
-            const res = await fetch(`${apiUrl}/settings`, {
+            const res = await authFetch(`${apiUrl}/settings`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ model })
@@ -96,7 +105,7 @@ export default function SettingsPage() {
 
     const handleReset = () => {
         setApiUrl("http://localhost:8000");
-        setModel("llama3.2");
+        setModel("qwen2.5-coder:3b");
         setAutoRetry(true);
         localStorage.removeItem("apiUrl");
         localStorage.removeItem("model");
@@ -232,6 +241,24 @@ export default function SettingsPage() {
                     Reset Defaults
                 </button>
             </div>
+
+            {authStatus?.auth_enabled && authStatus.authenticated && (
+                <div className="glass-card flex items-center justify-between p-5">
+                    <p className="text-sm text-muted-foreground">
+                        Signed in as <span className="font-medium text-foreground">{authStatus.username}</span>
+                    </p>
+                    <button
+                        type="button"
+                        onClick={async () => {
+                            await logout();
+                            router.push("/login");
+                        }}
+                        className="rounded-lg border border-border bg-muted/30 px-4 py-2 text-sm font-medium text-muted-foreground transition-all hover:bg-muted hover:text-foreground"
+                    >
+                        Log out
+                    </button>
+                </div>
+            )}
         </div>
     );
 }

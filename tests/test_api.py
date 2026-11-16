@@ -45,6 +45,9 @@ def client(monkeypatch):
     monkeypatch.setattr(Config, "AUDIT_DB_PATH", os.path.join(tmp, "audit.db"))
     db._initialized = False
     job_store.jobs.clear()
+    from backend.app.routers import auth as auth_router
+    auth_router.audit_limiter.reset()
+    auth_router.login_limiter.reset()
     fake = FakeGraph()
     monkeypatch.setattr(audit_runner, "graph", fake)
     monkeypatch.setattr("src.llm.warm_up_model", lambda: None)

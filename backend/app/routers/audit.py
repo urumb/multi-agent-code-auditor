@@ -3,9 +3,10 @@
 import logging
 from typing import List
 
-from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 
+from backend.app.routers.auth import enforce_audit_limits
 from backend.app.schemas.code_file import AuditRequest, AuditResultResponse, CodeFile
 from backend.app.services.audit_jobs import (
     cap_file_count,
@@ -25,7 +26,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["audit"])
 
 
-@router.post("/audit/stream")
+@router.post("/audit/stream", dependencies=[Depends(enforce_audit_limits)])
 def audit_stream_start(request: AuditRequest, background_tasks: BackgroundTasks) -> dict:
     """Start a GitHub or paste audit in the background and return its job_id."""
     logger.info("Received background audit request — input_type: %s", request.input_type)
@@ -47,7 +48,7 @@ def audit_stream_start(request: AuditRequest, background_tasks: BackgroundTasks)
     return {"job_id": job_id}
 
 
-@router.post("/audit/stream/upload")
+@router.post("/audit/stream/upload", dependencies=[Depends(enforce_audit_limits)])
 async def audit_stream_upload_start(
     background_tasks: BackgroundTasks,
     files: List[UploadFile] = File(...),
@@ -99,14 +100,14 @@ def _resolve_code_files(request: AuditRequest) -> List[CodeFile]:
     return []
 
 
-@router.post("/audit", response_model=AuditResultResponse)
+@router.post("/audit", response_model=AuditResultResponse, dependencies=[Depends(enforce_audit_limits)])
 def audit_code(request: AuditRequest) -> AuditResultResponse:
     """Run a full audit synchronously (fallback; the UI uses /audit/stream)."""
     logger.info("Received sync audit request — input_type: %s", request.input_type)
     return run_audit_on_files(cap_file_count(_resolve_code_files(request)))
 
 
-@router.post("/audit/upload", response_model=AuditResultResponse)
+@router.post("/audit/upload", response_model=AuditResultResponse, dependencies=[Depends(enforce_audit_limits)])
 async def audit_upload(files: List[UploadFile] = File(...)) -> AuditResultResponse:
     """Run a full audit of uploaded files synchronously."""
     logger.info("Received upload audit request — %d file(s)", len(files))

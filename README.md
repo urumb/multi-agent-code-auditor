@@ -87,7 +87,7 @@ cd multi-agent-code-auditor
 docker compose up --build
 ```
 
-Open http://localhost:3000. The first start downloads the model (`llama3.2`, ~2 GB) into a Docker volume; later starts are quick. Audit history is kept in the `auditor_data` volume.
+Open http://localhost:3000. The first start downloads the model (`qwen2.5-coder:3b`, ~2 GB) into a Docker volume; later starts are quick. Audit history is kept in the `auditor_data` volume.
 
 - **Security:** ports are published on `127.0.0.1` only, so the unauthenticated backend isn't reachable from your network. Ollama isn't published at all.
 - **Use the Ollama already on your machine** instead of the bundled one (no second model download):
@@ -125,7 +125,7 @@ cp .env.example .env   # Windows: copy .env.example .env
 ### 3. Ollama Setup
 Install [Ollama](https://ollama.com/) and run the service locally.
 ```bash
-ollama pull llama3.2
+ollama pull qwen2.5-coder:3b
 ollama serve
 ```
 
@@ -219,7 +219,8 @@ Measured results (27 labeled issues across 8 files, 2 of them clean):
 |---|---|---|---|---|
 | Static tools only, with semgrep | 24/27 | 96% | 0 | ~15s |
 | Static tools only, no semgrep | 18/27 | 95% | 0 | ~7s |
-| Tools + AI agents (`llama3.2` 3B, CPU), no semgrep | 18/27 | 58% | 8 | ~15 min |
+| Tools + AI agents, `qwen2.5-coder:3b` (default), no semgrep | 20/27 | 70% | 4 | ~6 min |
+| Tools + AI agents, `llama3.2` 3B, no semgrep | 20/27 | 68% | 6 | ~7 min |
 
 With a small local model the AI agents add little beyond the tools and introduce false positives; they are most useful for issues no rule covers. A larger model (e.g. `qwen2.5-coder:7b`) is worth benchmarking if you have the hardware. The static-only run is also enforced in CI (`tests/test_batch2_findings.py`), so a change that makes the tools miss known issues or flag clean code fails the build.
 
@@ -232,7 +233,7 @@ With a small local model the AI agents add little beyond the tools and introduce
 - **No telemetry:** Next.js usage telemetry is switched off in `frontend/next.config.ts`, ChromaDB's is switched off in `src/utils/memory.py`, semgrep runs with `--metrics=off`, and LangSmith tracing is never enabled.
 - **Dependencies are audited:** CI runs `pip-audit` and `npm audit` on every push and once a week, and fails if a known vulnerability appears. For extra coverage, turn on free Dependabot alerts in the repository's *Settings → Code security*.
 - Everything the app stores lives in `data/` (audit history database, optional ChromaDB memory); set `DATA_DIR` to move it. Data from older versions in the project root is moved there automatically on first start. `data/`, `.env`, virtualenvs and build output are all in `.gitignore`. They contain your code and findings, so never commit them.
-- The backend has no authentication and only allows CORS from `FRONTEND_ORIGINS` (default: `localhost:3000`). Keep it bound to localhost unless you add auth.
+- Locally, login is off and the backend only listens on `localhost` and only allows CORS from `FRONTEND_ORIGINS` (default: `localhost:3000`). Before exposing it to any network, use the production setup in *Deployment* (login, HTTPS, rate limits).
 - Private GitHub repositories are not supported (no tokens are ever requested or stored).
 
 ---
@@ -248,7 +249,7 @@ Local LLMs are the bottleneck, especially on CPU-only machines (typically ~10 to
 - Each agent reports up to `MAX_FINDINGS_PER_CHUNK` findings per chunk (default 2). Lower it for speed, raise it for thoroughness; each extra finding costs ~130 output tokens.
 - Repository audits skip near-empty files and are capped at `MAX_FILES_PER_AUDIT` files per run (default 25).
 
-Rough timings on a laptop CPU with `llama3.2`: Quick ~20-35s per file, Full ~1-2 min per file. For faster audits, use *Quick*, or pull a smaller model (`ollama pull llama3.2:1b`) and select it in Settings. Settings only lists models that are actually installed in Ollama.
+Rough timings on a laptop CPU with `qwen2.5-coder:3b`: Quick ~20-35s per file, Full ~1-2 min per file. For faster audits, use *Quick*, or pull a smaller model (`ollama pull qwen2.5-coder:1.5b`) and select it in Settings. Settings only lists models that are actually installed in Ollama.
 
 ---
 
@@ -257,20 +258,53 @@ Rough timings on a laptop CPU with `llama3.2`: Quick ~20-35s per file, Full ~1-2
 | Problem | Fix |
 |---|---|
 | Header shows **offline** | The backend isn't running on port 8000. Start it (step 4). |
-| Audits fail or time out | Make sure Ollama is running (`ollama serve`) and the model is pulled (`ollama pull llama3.2`). |
+| Audits fail or time out | Make sure Ollama is running (`ollama serve`) and the model is pulled (`ollama pull qwen2.5-coder:3b`). |
 | GitHub audit fails immediately | The repo must be public and `git` must be installed. |
 | Audit times out or is slow | Use **Quick** scan depth, a smaller model, or audit fewer files. See *Performance Notes*. |
 | Model not in Settings list | Only installed models are listed. Run `ollama pull <model>`. |
 | UI feels slow | Use `npm run build && npm start` instead of `npm run dev`. |
-| Docker model download fails with `x509: certificate signed by unknown authority` | Your network intercepts HTTPS (common on campus/corporate Wi-Fi), so containers can't verify the download. Pull on another network (`docker compose exec ollama ollama pull llama3.2`), or use the Ollama installed on your machine (see *Quick Start with Docker*). The app still starts without the model. |
+| Docker model download fails with `x509: certificate signed by unknown authority` | Your network intercepts HTTPS (common on campus/corporate Wi-Fi), so containers can't verify the download. Pull on another network (`docker compose exec ollama ollama pull qwen2.5-coder:3b`), or use the Ollama installed on your machine (see *Quick Start with Docker*). The app still starts without the model. |
 | Docker Desktop crashes with "The file cannot be accessed by the system" on a `.sock` file | A leftover socket from an earlier crash. Quit Docker Desktop, rename the folder named in the error (e.g. `%LOCALAPPDATA%\Docker\run` → `run.old`), and start it again. Don't use *Reset to factory defaults*: it deletes all images and volumes. |
 
 ---
 
-## 🚀 Deployment Note
+## 🚀 Deployment
 
-- **Frontend**: Standard Node.js deployment (Vercel, Netlify, Docker).
-- **Backend**: Strongly relies on local LLM capabilities. To maintain complete data privacy, the API server, ChromaDB instance, and Ollama service must all be deployed to a secured environment with adequate local compute (e.g. AWS EC2, bare-metal servers) rather than serverless functions.
+The app is ready to run on a server with login, HTTPS and rate limits, using only free software. On your own laptop none of this is needed: login is off and everything listens on `localhost` only.
+
+**What you need:** a Linux server with Docker and at least 8 GB of RAM (16 GB recommended) for the AI model, and a domain name pointing at it. Oracle Cloud's *Always Free* tier (up to 24 GB RAM, ARM) fits and costs nothing.
+
+**1. Create the login on any machine with this repo:**
+
+```bash
+python main.py hash-password      # asks for a password (12+ characters), prints its hash
+python main.py new-secret         # prints a random session secret
+```
+
+**2. On the server, create `.env`** (never commit it):
+
+```bash
+DOMAIN=auditor.example.com
+AUTH_USERNAME=admin
+AUTH_PASSWORD_HASH=scrypt:16384:8:1:...   # output of hash-password
+SESSION_SECRET=...                         # output of new-secret
+```
+
+**3. Start it:**
+
+```bash
+docker compose -f docker-compose.prod.yml up -d --build
+```
+
+Open `https://<your domain>` and sign in.
+
+What the production setup does (`docker-compose.prod.yml`, `deploy/Caddyfile`):
+
+- **Only Caddy is reachable from the internet** (ports 80/443). It gets and renews a free HTTPS certificate from Let's Encrypt automatically, adds security headers, and serves the UI and API from one address (API under `/api`).
+- **Login is required** for everything except the health check. Passwords are stored only as scrypt hashes; sessions are signed, HttpOnly, `Secure`, `SameSite=Strict` cookies that expire after `SESSION_TTL_HOURS` (default 12).
+- **It refuses to start** if login is switched on but the username, password hash or session secret is missing, instead of running unprotected.
+- **Rate limits:** 5 login attempts and 10 audit starts per minute per address, and at most 2 audits running at once (`LOGIN_ATTEMPTS_PER_MINUTE`, `AUDITS_PER_MINUTE`, `MAX_CONCURRENT_AUDITS`).
+- The backend, frontend and Ollama aren't published at all; audit history lives in the `auditor_data` volume (back it up with `docker run --rm -v multi-agent-auditor_auditor_data:/data -v "$PWD":/backup alpine tar czf /backup/auditor-data.tgz -C /data .`).
 
 ---
 
@@ -278,16 +312,19 @@ Rough timings on a laptop CPU with `llama3.2`: Quick ~20-35s per file, Full ~1-2
 
 ```
 backend/app/main.py            FastAPI app: lifespan, CORS, router wiring
-backend/app/routers/           HTTP routes: audit (start + SSE stream), history, settings
+backend/app/routers/           HTTP routes: audit (start, stream, cancel), history (+ SARIF), settings, auth
+backend/app/security.py        login (scrypt hashes, signed sessions) and rate limiting
 backend/app/services/          audit_jobs (running audits), job_store (live jobs), db (SQLite), input_processor
 src/graph.py                   LangGraph pipeline: manager -> static analysis -> agents -> reviewer
 src/agents/                    Manager, Reviewer, and the Security/Performance/Quality agents (shared base.py)
 src/static_analysis.py         bandit / ruff / semgrep pre-pass
 src/findings.py                finding schema, line anchoring, merging and de-duplication
+src/cli.py, src/sarif.py       command line (python main.py scan) and SARIF export
 rules/semgrep.yml              bundled offline semgrep rules (JS/TS)
 benchmarks/                    labeled sample files + recall/precision scorer
-docker/, docker-compose.yml    container setup
-frontend/                      Next.js UI
+docker/, docker-compose.yml    local container setup
+docker-compose.prod.yml, deploy/  server setup: Caddy (HTTPS), login, rate limits
+frontend/                      Next.js UI (browser tests in frontend/e2e)
 ```
 
 ---

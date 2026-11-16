@@ -147,3 +147,11 @@ test("history shows an incomplete audit's warning", async ({ page }) => {
         `${API}/audit/history/abc/sarif`
     );
 });
+
+test("history says when the backend is unreachable instead of showing it as empty", async ({ page }) => {
+    await fakeBasics(page);
+    await page.route(`${API}/audit/history?*`, (route) => route.abort("connectionrefused"));
+    await page.goto("/history");
+    await expect(page.getByRole("alert")).toContainText("Couldn't load audit history");
+    await expect(page.getByText("No audit history yet")).toHaveCount(0);
+});

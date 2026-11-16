@@ -10,7 +10,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.app.routers import audit, history, settings
+from backend.app.routers import audit, auth, history, settings
 from backend.app.services import db
 from src import llm
 from src.config import Config
@@ -23,6 +23,7 @@ logging.basicConfig(
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    Config.check_security()  # fail closed: never run with half-configured login
     Config.migrate_legacy_data()
     db.init_db()
     # Pre-load the model so the first audit doesn't pay the cold-start cost.
@@ -37,10 +38,15 @@ app = FastAPI(
     version="0.6.0",
 )
 
+# Login check (a no-op unless AUTH_ENABLED=true). Registered before CORS so
+# CORS wraps it: Starlette runs the last-added middleware first, and 401s
+# must still carry CORS headers for the browser to read them.
+app.middleware("http")(auth.require_login)
+
 app.add_middleware(
     CORSMiddleware,
-    # Explicit allowlist, not a wildcard: this server has no authentication,
-    # so an unrestricted CORS policy would let any website the user has open
+    # Explicit allowlist, not a wildcard: with login off (local use), an
+    # unrestricted CORS policy would let any website the user has open
     # silently trigger audits or read past results via fetch().
     allow_origins=Config.FRONTEND_ORIGINS,
     allow_credentials=False,
@@ -48,6 +54,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth.router)
 app.include_router(audit.router)
 app.include_router(history.router)
 app.include_router(settings.router)

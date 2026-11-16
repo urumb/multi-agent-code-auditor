@@ -25,6 +25,55 @@ export function getApiBase(): string {
     }
 }
 
+/**
+ * fetch() for backend calls. When login is enabled and the session is
+ * missing or expired, the backend answers 401: send the user to the login
+ * page, then back to where they were.
+ */
+export async function authFetch(url: string, init?: RequestInit): Promise<Response> {
+    const response = await fetch(url, init);
+    if (
+        response.status === 401 &&
+        typeof window !== "undefined" &&
+        !window.location.pathname.startsWith("/login")
+    ) {
+        const next = window.location.pathname + window.location.search;
+        // A full page load (not the router): this helper runs outside React,
+        // and reloading also clears any state from the expired session.
+        // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+        window.location.href = `/login?next=${encodeURIComponent(next)}`;
+    }
+    return response;
+}
+
+export interface AuthStatus {
+    auth_enabled: boolean;
+    authenticated: boolean;
+    username: string | null;
+}
+
+export async function fetchAuthStatus(): Promise<AuthStatus> {
+    const response = await fetch(`${getApiBase()}/auth/me`);
+    return response.json() as Promise<AuthStatus>;
+}
+
+/** Returns null on success, or a message to show the user. */
+export async function login(username: string, password: string): Promise<string | null> {
+    const response = await fetch(`${getApiBase()}/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+    });
+    if (response.ok) return null;
+    if (response.status === 429) return "Too many attempts. Wait a minute and try again.";
+    if (response.status === 401) return "Wrong username or password.";
+    return `Login failed (HTTP ${response.status}).`;
+}
+
+export async function logout(): Promise<void> {
+    await fetch(`${getApiBase()}/auth/logout`, { method: "POST" });
+}
+
 /* ------------------------------------------------------------------ */
 /*  Types matching the backend responses                                */
 /* ------------------------------------------------------------------ */
@@ -118,7 +167,7 @@ export interface StreamCallbacks {
 /* ------------------------------------------------------------------ */
 
 async function apiFetch<T>(endpoint: string, options?: RequestInit): Promise<T> {
-    const response = await fetch(`${getApiBase()}${endpoint}`, {
+    const response = await authFetch(`${getApiBase()}${endpoint}`, {
         ...options,
     });
 
@@ -150,7 +199,7 @@ async function syncSelectedModel(): Promise<void> {
     try {
         const model = window.localStorage.getItem("model");
         if (!model) return;
-        await fetch(`${getApiBase()}/settings`, {
+        await authFetch(`${getApiBase()}/settings`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ model }),
@@ -166,7 +215,7 @@ export async function fetchInstalledModels(): Promise<{ models: string[]; curren
 
 /** Ask the backend to stop a running audit (files already done are kept). */
 export async function cancelAuditJob(jobId: string): Promise<void> {
-    const response = await fetch(`${getApiBase()}/audit/stream/${encodeURIComponent(jobId)}/cancel`, {
+    const response = await authFetch(`${getApiBase()}/audit/stream/${encodeURIComponent(jobId)}/cancel`, {
         method: "POST",
     });
     // 409 = it finished just before the click; nothing left to cancel.
@@ -232,7 +281,7 @@ export async function subscribeToAuditJob(
 ): Promise<void> {
     let response: Response;
     try {
-        response = await fetch(`${getApiBase()}/audit/stream/${jobId}`, {
+        response = await authFetch(`${getApiBase()}/audit/stream/${jobId}`, {
             method: "GET",
         });
     } catch {

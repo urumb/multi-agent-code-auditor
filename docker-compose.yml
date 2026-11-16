@@ -2,18 +2,19 @@
 #
 #   docker compose up --build        then open http://localhost:3000
 #
-# The first start downloads the model (MODEL_NAME, default llama3.2, ~2 GB).
+# The first start downloads the model (MODEL_NAME, default qwen2.5-coder:3b, ~2 GB).
 #
-# Security: the backend has no authentication, so every published port is
-# bound to 127.0.0.1 (this machine only, not your network). Ollama is not
-# published at all; only the backend can reach it.
+# Security: this is the LOCAL setup, with login off, so every published port
+# is bound to 127.0.0.1 (this machine only, not your network). Ollama is not
+# published at all; only the backend can reach it. For a server, use
+# docker-compose.prod.yml instead (login, HTTPS, rate limits).
 #
 # Already running Ollama on this machine? Skip the bundled one:
 #   OLLAMA_BASE_URL=http://host.docker.internal:11434 docker compose up --build --no-deps frontend backend
 
 services:
   ollama:
-    image: ollama/ollama:0.13.0
+    image: ollama/ollama:0.40.13
     volumes:
       - ollama_models:/root/.ollama
     restart: unless-stopped
@@ -21,9 +22,9 @@ services:
   # One-shot: pull the model into the bundled Ollama, then exit. A failed
   # pull (offline, or a network that intercepts HTTPS) only warns, so the
   # app still starts; pull later with:
-  #   docker compose exec ollama ollama pull llama3.2
+  #   docker compose exec ollama ollama pull qwen2.5-coder:3b
   ollama-pull:
-    image: ollama/ollama:0.13.0
+    image: ollama/ollama:0.40.13
     depends_on:
       - ollama
     environment:
@@ -33,9 +34,9 @@ services:
       - -c
       - >-
         until ollama list >/dev/null 2>&1; do sleep 1; done;
-        ollama pull ${MODEL_NAME:-llama3.2}
-        || echo "WARNING: could not download ${MODEL_NAME:-llama3.2}. Audits will fail until it is pulled:
-        docker compose exec ollama ollama pull ${MODEL_NAME:-llama3.2}"
+        ollama pull ${MODEL_NAME:-qwen2.5-coder:3b}
+        || echo "WARNING: could not download ${MODEL_NAME:-qwen2.5-coder:3b}. Audits will fail until it is pulled:
+        docker compose exec ollama ollama pull ${MODEL_NAME:-qwen2.5-coder:3b}"
     restart: "no"
 
   backend:
@@ -44,7 +45,7 @@ services:
       dockerfile: docker/backend.Dockerfile
     environment:
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
-      MODEL_NAME: ${MODEL_NAME:-llama3.2}
+      MODEL_NAME: ${MODEL_NAME:-qwen2.5-coder:3b}
       FRONTEND_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
       MAX_FILES_PER_AUDIT: ${MAX_FILES_PER_AUDIT:-25}
     volumes:

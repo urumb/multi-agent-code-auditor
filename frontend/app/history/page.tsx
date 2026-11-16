@@ -32,6 +32,8 @@ export default function HistoryPage() {
     // rather than set synchronously inside the effect.
     const [loadedPage, setLoadedPage] = useState<number | null>(null);
     const loading = loadedPage !== page;
+    // Distinguish "couldn't reach the backend" from "no audits yet".
+    const [loadError, setLoadError] = useState(false);
 
     useEffect(() => {
         let cancelled = false;
@@ -40,12 +42,14 @@ export default function HistoryPage() {
                 if (cancelled) return;
                 setHasMore(data.length > PAGE_SIZE);
                 setEntries(data.slice(0, PAGE_SIZE));
+                setLoadError(false);
                 setLoadedPage(page);
             })
             .catch(() => {
                 if (cancelled) return;
                 setEntries([]);
                 setHasMore(false);
+                setLoadError(true);
                 setLoadedPage(page);
             });
         return () => {
@@ -67,6 +71,11 @@ export default function HistoryPage() {
                     {Array.from({ length: 6 }).map((_, i) => (
                         <Skeleton key={i} className="h-14 w-full" />
                     ))}
+                </div>
+            ) : loadError ? (
+                <div role="alert" className="rounded-lg border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-400">
+                    Couldn&apos;t load audit history: the backend isn&apos;t reachable. Check that it&apos;s running,
+                    then reload this page.
                 </div>
             ) : entries.length === 0 ? (
                 <EmptyState

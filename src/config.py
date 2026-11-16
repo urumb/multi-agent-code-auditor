@@ -39,7 +39,7 @@ class Config:
 
     # Model to use explicitly. Mutable at runtime via POST /settings; agents
     # read this attribute on every run rather than capturing it once.
-    MODEL_NAME = os.getenv("MODEL_NAME", "llama3.2")
+    MODEL_NAME = os.getenv("MODEL_NAME", "qwen2.5-coder:3b")
 
     # Hard timeout for auditing one file: every agent LLM call for that
     # file's chunks, serialized through one local Ollama. 240s gives CPU-only
@@ -49,6 +49,38 @@ class Config:
     # Most files audited per run. Each costs roughly a minute on a CPU-only
     # machine; the smallest files are kept. Raise it if you have a GPU.
     MAX_FILES_PER_AUDIT = int(os.getenv("MAX_FILES_PER_AUDIT", "25"))
+
+    # --- Deployment security (see backend/app/security.py) ---
+    # Login. Off for local use (the backend only listens on localhost);
+    # required before exposing the app to a network. Generate the values with
+    #   python main.py hash-password      and      python main.py new-secret
+    AUTH_ENABLED = os.getenv("AUTH_ENABLED", "false").lower() == "true"
+    AUTH_USERNAME = os.getenv("AUTH_USERNAME", "")
+    AUTH_PASSWORD_HASH = os.getenv("AUTH_PASSWORD_HASH", "")
+    SESSION_SECRET = os.getenv("SESSION_SECRET", "")
+    SESSION_TTL_HOURS = float(os.getenv("SESSION_TTL_HOURS", "12"))
+    # Send the session cookie only over HTTPS. Keep true in production.
+    COOKIE_SECURE = os.getenv("COOKIE_SECURE", "true").lower() == "true"
+    # Rate limits (per client address, per minute) and concurrent audits.
+    LOGIN_ATTEMPTS_PER_MINUTE = int(os.getenv("LOGIN_ATTEMPTS_PER_MINUTE", "5"))
+    AUDITS_PER_MINUTE = int(os.getenv("AUDITS_PER_MINUTE", "10"))
+    MAX_CONCURRENT_AUDITS = int(os.getenv("MAX_CONCURRENT_AUDITS", "2"))
+
+    @staticmethod
+    def check_security() -> None:
+        """Refuse to start with login switched on but not configured,
+        instead of silently running unprotected (fail closed)."""
+        if not Config.AUTH_ENABLED:
+            return
+        problems = []
+        if not Config.AUTH_USERNAME:
+            problems.append("AUTH_USERNAME is empty")
+        if not Config.AUTH_PASSWORD_HASH.startswith("scrypt:"):
+            problems.append("AUTH_PASSWORD_HASH is missing (generate with: python main.py hash-password)")
+        if len(Config.SESSION_SECRET) < 32:
+            problems.append("SESSION_SECRET must be at least 32 characters (generate with: python main.py new-secret)")
+        if problems:
+            raise RuntimeError("AUTH_ENABLED=true but login is not configured: " + "; ".join(problems))
 
     # Reuse the previous report for files that haven't changed (and whose
     # audit settings haven't changed) instead of re-auditing them.
