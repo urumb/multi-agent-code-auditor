@@ -58,7 +58,8 @@ test("login never redirects to another site", async ({ page }) => {
     await expect(page).toHaveURL("http://localhost:3000/");
 });
 
-for (const next of ["/\evil.example.com/steal", "https://evil.example.com/", "/login?next=/history"]) {
+// "/" + backslash + "evil..." — browsers treat the backslash like "/".
+for (const next of ["/" + "\\" + "evil.example.com/steal", "https://evil.example.com/", "/login?next=/history"]) {
     test(`login ignores unsafe return address ${JSON.stringify(next)}`, async ({ page }) => {
         await fakeBasics(page);
         await page.route(`${API}/auth/login`, (route) => json(route, { authenticated: true }));
