@@ -6,9 +6,8 @@ import { defineConfig, devices } from "@playwright/test";
  * results are deterministic.
  *
  * Run locally (build first; uses the production server):
- *   npm install --no-save @playwright/test@1.64.1
- *   npx playwright install chromium
- *   npm run build && npx playwright test
+ *   npx playwright install chromium     # once
+ *   npm run build && npm run test:e2e
  */
 export default defineConfig({
     testDir: "./e2e",
