@@ -50,6 +50,10 @@ class Config:
     # machine; the smallest files are kept. Raise it if you have a GPU.
     MAX_FILES_PER_AUDIT = int(os.getenv("MAX_FILES_PER_AUDIT", "25"))
 
+    # Reuse the previous report for files that haven't changed (and whose
+    # audit settings haven't changed) instead of re-auditing them.
+    CACHE_ENABLED = os.getenv("CACHE_ENABLED", "true").lower() == "true"
+
     # Run bandit / ruff (and semgrep, if installed) before the LLM agents.
     STATIC_ANALYSIS_ENABLED = os.getenv("STATIC_ANALYSIS_ENABLED", "true").lower() == "true"
 

@@ -1,4 +1,5 @@
 # Author: urumb
+import fnmatch
 import io
 import logging
 import os
@@ -7,7 +8,7 @@ import shutil
 import subprocess
 import tempfile
 import zipfile
-from typing import List
+from typing import List, Sequence
 
 import requests
 from fastapi import HTTPException, UploadFile
@@ -40,6 +41,58 @@ _GITHUB_URL_RE = re.compile(
     r"^(?:https?://)?(?:www\.)?github\.com/(?P<owner>[\w.-]+)/(?P<repo>[\w.-]+?)"
     r"(?:\.git)?(?:/(?:tree|blob)/(?P<ref>[^?#]+))?/?(?:[?#].*)?$"
 )
+
+
+def collect_source_files(
+    root: str,
+    label: str = "",
+    exclude: Sequence[str] = (),
+) -> List[CodeFile]:
+    """Walk ``root`` and read every auditable source file.
+
+    Shared by GitHub audits (on the cloned checkout) and the command-line
+    ``scan`` (on a local folder), so both pick the same files. Paths are
+    relative to ``root`` with forward slashes. ``exclude`` holds glob
+    patterns (``fnmatch`` style) matched against those relative paths.
+    """
+    code_files: List[CodeFile] = []
+    skipped_large = 0
+    for current, dirs, files in os.walk(root):
+        # In-place modification to skip ignored directories
+        dirs[:] = sorted(d for d in dirs if d not in IGNORED_DIRS)
+
+        for file_name in sorted(files):
+            if len(code_files) >= MAX_FILES_SCANNED:
+                break
+
+            _, ext = os.path.splitext(file_name)
+            if ext.lower() not in ALLOWED_EXTENSIONS:
+                continue
+
+            abs_path = os.path.join(current, file_name)
+            rel_path = os.path.relpath(abs_path, root).replace(os.sep, "/")
+            if any(fnmatch.fnmatch(rel_path, pattern) for pattern in exclude):
+                continue
+
+            try:
+                if os.path.getsize(abs_path) > MAX_FILE_BYTES:
+                    skipped_large += 1
+                    continue
+                with open(abs_path, "r", encoding="utf-8", errors="ignore") as f:
+                    content = f.read()
+                if len(content.strip()) < MIN_USEFUL_CHARS:
+                    continue  # empty __init__.py etc.: nothing to audit, but costs a full LLM pass
+                code_files.append(CodeFile(path=rel_path, content=content))
+            except OSError as read_err:
+                logger.warning("Skipping unreadable file %s: %s", rel_path, read_err)
+
+        if len(code_files) >= MAX_FILES_SCANNED:
+            logger.warning("Scan capped at %d files: %s", MAX_FILES_SCANNED, label or root)
+            break
+
+    if skipped_large:
+        logger.info("Skipped %d file(s) over %d bytes", skipped_large, MAX_FILE_BYTES)
+    return code_files
 
 
 def process_github_repo(url: str) -> List[CodeFile]:
@@ -92,41 +145,7 @@ def process_github_repo(url: str) -> List[CodeFile]:
                 ),
             )
 
-        code_files: List[CodeFile] = []
-        skipped_large = 0
-        for root, dirs, files in os.walk(tmp_dir):
-            # In-place modification to skip ignored directories
-            dirs[:] = [d for d in dirs if d not in IGNORED_DIRS]
-
-            for file_name in files:
-                if len(code_files) >= MAX_FILES_SCANNED:
-                    break
-
-                _, ext = os.path.splitext(file_name)
-                if ext.lower() not in ALLOWED_EXTENSIONS:
-                    continue
-
-                abs_path = os.path.join(root, file_name)
-                rel_path = os.path.relpath(abs_path, tmp_dir)
-
-                try:
-                    if os.path.getsize(abs_path) > MAX_FILE_BYTES:
-                        skipped_large += 1
-                        continue
-                    with open(abs_path, "r", encoding="utf-8", errors="ignore") as f:
-                        content = f.read()
-                    if len(content.strip()) < MIN_USEFUL_CHARS:
-                        continue  # empty __init__.py etc.: nothing to audit, but costs a full LLM pass
-                    code_files.append(CodeFile(path=rel_path, content=content))
-                except OSError as read_err:
-                    logger.warning("Skipping unreadable file %s: %s", rel_path, read_err)
-
-            if len(code_files) >= MAX_FILES_SCANNED:
-                logger.warning("Repository scan capped at %d files: %s", MAX_FILES_SCANNED, url)
-                break
-
-        if skipped_large:
-            logger.info("Skipped %d file(s) over %d bytes", skipped_large, MAX_FILE_BYTES)
+        code_files = collect_source_files(tmp_dir, label=url)
 
         if not code_files:
             raise HTTPException(

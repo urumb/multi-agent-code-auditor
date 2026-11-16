@@ -19,6 +19,7 @@ from backend.app.services import db
 from backend.app.services.audit_runner import run_audit_on_code
 from backend.app.services.input_processor import process_github_repo
 from backend.app.services.job_store import add_job_event, finalize_job, get_job
+from backend.app.services.result_cache import cache_key
 from src.config import Config
 
 logger = logging.getLogger(__name__)
@@ -38,7 +39,9 @@ def report_risk(final_report: str) -> Tuple[float, str]:
         return 0.0, "Low"
 
 
-def file_result(path: str, final_report: str = "", error: Optional[str] = None) -> Dict[str, Any]:
+def file_result(
+    path: str, final_report: str = "", error: Optional[str] = None, cached: bool = False
+) -> Dict[str, Any]:
     """The result record for one audited file (also used for failures)."""
     risk_score, max_severity = report_risk(final_report) if final_report else (0.0, "Low")
     return {
@@ -47,7 +50,17 @@ def file_result(path: str, final_report: str = "", error: Optional[str] = None) 
         "risk_score": risk_score,
         "max_severity": max_severity,
         "error": error,
+        "cached": cached,
     }
+
+
+def _cacheable(final_report: str) -> bool:
+    """Only clean results are reused: never one where AI analysis failed."""
+    try:
+        report = json.loads(final_report)
+    except (json.JSONDecodeError, TypeError):
+        return False
+    return isinstance(report, dict) and not report.get("warnings")
 
 
 def audit_file(
@@ -58,8 +71,21 @@ def audit_file(
     cancel_event: Optional[threading.Event] = None,
     log_callback: Optional[Callable[..., None]] = None,
     event_callback: Optional[Callable[[str, Dict[str, Any]], None]] = None,
+    use_cache: bool = True,
 ) -> Dict[str, Any]:
-    """Run the pipeline on one file and return its ``file_result``. Raises on failure."""
+    """Run the pipeline on one file and return its ``file_result``. Raises on failure.
+
+    With ``use_cache``, an unchanged file (same content and audit settings)
+    reuses its previous report instead of being re-audited.
+    """
+    key = cache_key(file.content, file.path, depth) if use_cache and Config.CACHE_ENABLED else None
+    if key:
+        cached_report = db.cache_get(key)
+        if cached_report is not None:
+            if log_callback:
+                log_callback("System", f"Unchanged since last audit, reused previous result: {file.path}", "info")
+            return file_result(file.path, cached_report, cached=True)
+
     output = run_audit_on_code(
         file.content,
         log_callback=log_callback,
@@ -69,7 +95,10 @@ def audit_file(
         cancel_event=cancel_event,
         file_path=file.path,
     )
-    return file_result(file.path, output.get("final_report", ""))
+    final_report = output.get("final_report", "")
+    if key and _cacheable(final_report):
+        db.cache_put(key, file.path, final_report, time.time())
+    return file_result(file.path, final_report)
 
 
 def top_risk_files(results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -112,7 +141,9 @@ def _log(job_id: str, message: str, level: str = "info") -> None:
     add_job_event(job_id, "log", {"agent": "System", "message": message, "level": level})
 
 
-def _audit_file_with_timeout(job_id: str, file: CodeFile, total: int, depth: str) -> Dict[str, Any]:
+def _audit_file_with_timeout(
+    job_id: str, file: CodeFile, total: int, depth: str, use_cache: bool = True
+) -> Dict[str, Any]:
     """Audit one file inside a job, giving up after PER_FILE_TIMEOUT_SECONDS."""
     # Once set, this both cancels the file's remaining LLM calls (so it
     # releases the shared LLM slot instead of starving the next file) and
@@ -137,6 +168,7 @@ def _audit_file_with_timeout(job_id: str, file: CodeFile, total: int, depth: str
     future = executor.submit(
         audit_file, file, total, depth,
         cancel_event=abandoned, log_callback=log_callback, event_callback=event_callback,
+        use_cache=use_cache,
     )
     try:
         return future.result(timeout=Config.PER_FILE_TIMEOUT_SECONDS)
@@ -147,7 +179,9 @@ def _audit_file_with_timeout(job_id: str, file: CodeFile, total: int, depth: str
         executor.shutdown(wait=False)
 
 
-def run_audit_job(job_id: str, code_files: List[CodeFile], depth: str = "full") -> None:
+def run_audit_job(
+    job_id: str, code_files: List[CodeFile], depth: str = "full", use_cache: bool = True
+) -> None:
     """Background task: audit every file, streaming events into the job store."""
     job = get_job(job_id)
     if not job:
@@ -168,7 +202,7 @@ def run_audit_job(job_id: str, code_files: List[CodeFile], depth: str = "full") 
             _log(job_id, f"[{i}/{total}] Processing: {file.path}")
 
             try:
-                result = _audit_file_with_timeout(job_id, file, total, depth)
+                result = _audit_file_with_timeout(job_id, file, total, depth, use_cache)
                 add_job_event(job_id, "risk_update", {"file_path": file.path, "risk_score": result["risk_score"]})
             except concurrent.futures.TimeoutError:
                 result = file_result(file.path, error=f"Timed out after {Config.PER_FILE_TIMEOUT_SECONDS:g} seconds")
@@ -199,7 +233,9 @@ def run_audit_job(job_id: str, code_files: List[CodeFile], depth: str = "full") 
                      duration=round(time.time() - start_time, 2), error=str(exc))
 
 
-def run_github_audit_job(job_id: str, github_url: str, depth: str = "full") -> None:
+def run_github_audit_job(
+    job_id: str, github_url: str, depth: str = "full", use_cache: bool = True
+) -> None:
     """Background task: clone a GitHub repo, then audit it.
 
     Cloning happens here rather than in the request handler, so the endpoint
@@ -224,7 +260,7 @@ def run_github_audit_job(job_id: str, github_url: str, depth: str = "full") -> N
         return
 
     _log(job_id, f"Cloned repository — {len(code_files)} auditable file(s) found", "success")
-    run_audit_job(job_id, code_files, depth)
+    run_audit_job(job_id, code_files, depth, use_cache)
 
 
 async def stream_job_events(job_id: str):

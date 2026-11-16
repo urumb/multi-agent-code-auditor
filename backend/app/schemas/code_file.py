@@ -31,6 +31,8 @@ class AuditRequest(BaseModel):
     code: Optional[str] = None
     language: Optional[str] = None
     depth: Literal["quick", "full"] = "full"
+    # Reuse previous results for unchanged files (see services/result_cache.py).
+    use_cache: bool = True
 
     @model_validator(mode="after")
     def validate_fields_for_input_type(self) -> "AuditRequest":
@@ -71,6 +73,8 @@ class FileAuditResult(BaseModel):
     risk_score: float = 0.0
     max_severity: str = "Low"
     error: Optional[str] = None
+    # True when the file was unchanged and its previous report was reused.
+    cached: bool = False
 
 
 class AuditResultResponse(BaseModel):

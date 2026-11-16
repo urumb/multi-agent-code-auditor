@@ -35,9 +35,13 @@ export interface FileAuditResult {
     risk_score?: number;
     max_severity?: string;
     error: string | null;
+    /** True when the file was unchanged and its previous result was reused. */
+    cached?: boolean;
 }
 
 export interface AuditResultResponse {
+    /** Set for streamed audits; used to download the saved audit as SARIF. */
+    job_id?: string;
     total_files: number;
     /** Files left out because the input exceeded MAX_FILES_PER_AUDIT. */
     files_skipped?: number;
@@ -363,6 +367,11 @@ export async function fetchRecentAudits(): Promise<RecentAudit[]> {
 
 export async function fetchAuditHistory(limit = 20, offset = 0): Promise<AuditHistoryEntry[]> {
     return apiFetch<AuditHistoryEntry[]>(`/audit/history?limit=${limit}&offset=${offset}`);
+}
+
+/** URL of a saved audit's findings in SARIF format (a file download). */
+export function auditSarifUrl(jobId: string): string {
+    return `${getApiBase()}/audit/history/${encodeURIComponent(jobId)}/sarif`;
 }
 
 export async function fetchAuditHistoryDetail(jobId: string): Promise<AuditHistoryDetail> {

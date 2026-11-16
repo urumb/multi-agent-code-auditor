@@ -1,8 +1,10 @@
 # Author: urumb
 """Audit history, dashboard metrics and trends (all from the SQLite store)."""
 import datetime
+import json
 
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import JSONResponse
 
 from backend.app.services import db
 
@@ -56,6 +58,29 @@ def get_audit_history_detail(job_id: str) -> dict:
         "files_skipped": detail.get("files_skipped") or 0,
         "results": detail.get("results", []),
     }
+
+
+@router.get("/audit/history/{job_id}/sarif")
+def get_audit_sarif(job_id: str) -> JSONResponse:
+    """A past audit's findings as SARIF 2.1.0, for GitHub code scanning,
+    VS Code's SARIF Viewer and other tools that read the standard format."""
+    from src.sarif import to_sarif
+
+    detail = db.get_job_detail(job_id)
+    if not detail:
+        raise HTTPException(status_code=404, detail="Audit not found")
+    files = []
+    for result in detail.get("results", []):
+        try:
+            findings = json.loads(result.get("final_report") or "{}").get("findings", [])
+        except (json.JSONDecodeError, AttributeError):
+            findings = []
+        files.append({"file_path": result.get("file_path", ""), "findings": findings})
+    return JSONResponse(
+        to_sarif(files),
+        media_type="application/sarif+json",
+        headers={"Content-Disposition": f'attachment; filename="audit-{job_id[:8]}.sarif"'},
+    )
 
 
 @router.get("/metrics")

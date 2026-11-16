@@ -161,3 +161,32 @@ def test_audit_with_failing_ai_reports_warning_instead_of_success(client):
     assert "Pipeline completed successfully" not in messages
     result = next(e["data"] for e in events if e["type"] == "result")
     assert "Ollama isn't reachable" in json.loads(result["final_report"])["warnings"][0]
+
+
+def test_sarif_download_for_saved_audit(client):
+    job_id = client.post("/audit/stream", json={
+        "input_type": "paste", "code": "x = 'danger'\n" * 30, "depth": "quick",
+    }).json()["job_id"]
+    _events(client, job_id)
+
+    resp = client.get(f"/audit/history/{job_id}/sarif")
+    assert resp.status_code == 200
+    assert resp.headers["content-type"].startswith("application/sarif+json")
+    assert "attachment" in resp.headers["content-disposition"]
+    sarif = resp.json()
+    assert sarif["version"] == "2.1.0" and len(sarif["runs"][0]["results"]) == 1
+    assert client.get("/audit/history/nope/sarif").status_code == 404
+
+
+def test_second_audit_of_unchanged_code_is_marked_cached(client):
+    body = {"input_type": "paste", "code": "w = 'danger'\n" * 30, "depth": "quick"}
+    first = next(e["data"] for e in _events(client, client.post("/audit/stream", json=body).json()["job_id"])
+                 if e["type"] == "result")
+    second = next(e["data"] for e in _events(client, client.post("/audit/stream", json=body).json()["job_id"])
+                  if e["type"] == "result")
+    assert first["cached"] is False and second["cached"] is True
+
+    no_cache = {**body, "use_cache": False}
+    third = next(e["data"] for e in _events(client, client.post("/audit/stream", json=no_cache).json()["job_id"])
+                 if e["type"] == "result")
+    assert third["cached"] is False

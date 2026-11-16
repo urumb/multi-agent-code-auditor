@@ -76,6 +76,17 @@ def init_db() -> None:
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_audit_jobs_created_at ON audit_jobs(created_at DESC)"
         )
+        # Results of unchanged files, so re-audits only analyze what changed.
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS file_cache (
+                key TEXT PRIMARY KEY,
+                file_path TEXT NOT NULL,
+                final_report TEXT NOT NULL,
+                created_at REAL NOT NULL
+            )
+            """
+        )
         # Jobs still pending/running at startup were killed by a restart and
         # can never finish; mark them failed so History doesn't show them
         # as "running" forever.
@@ -251,3 +262,41 @@ def severity_trend(days: int = 14) -> List[Dict[str, Any]]:
         {"date": day, "critical": counts["critical"], "warning": counts["warning"], "info": counts["info"]}
         for day, counts in sorted(buckets.items())
     ]
+
+
+# ---------------------------------------------------------------------------
+# File result cache (re-audit only changed files)
+# ---------------------------------------------------------------------------
+CACHE_MAX_ENTRIES = 5000
+CACHE_MAX_AGE_SECONDS = 30 * 24 * 3600
+
+
+def cache_get(key: str) -> Optional[str]:
+    """The cached final report for ``key``, or None."""
+    init_db()
+    with _db() as conn:
+        row = conn.execute("SELECT final_report FROM file_cache WHERE key = ?", (key,)).fetchone()
+        return row["final_report"] if row else None
+
+
+def cache_put(key: str, file_path: str, final_report: str, now: float) -> None:
+    """Store a file's report and prune old or excess entries."""
+    init_db()
+    with _db() as conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO file_cache (key, file_path, final_report, created_at) VALUES (?, ?, ?, ?)",
+            (key, file_path, final_report, now),
+        )
+        conn.execute("DELETE FROM file_cache WHERE created_at < ?", (now - CACHE_MAX_AGE_SECONDS,))
+        conn.execute(
+            "DELETE FROM file_cache WHERE key NOT IN "
+            "(SELECT key FROM file_cache ORDER BY created_at DESC LIMIT ?)",
+            (CACHE_MAX_ENTRIES,),
+        )
+
+
+def cache_clear() -> int:
+    """Remove every cached file result; returns how many were removed."""
+    init_db()
+    with _db() as conn:
+        return conn.execute("DELETE FROM file_cache").rowcount

@@ -158,6 +158,34 @@ npm start
 
 ---
 
+## 💻 Command Line
+
+Audit a folder or file without the web UI:
+
+```bash
+python main.py scan .                                       # full audit (needs Ollama)
+python main.py scan src --static-only --fail-on high        # tools only: fast, no Ollama
+python main.py scan . --format sarif -o results.sarif       # SARIF for GitHub code scanning
+python main.py scan . --exclude "tests/*" --format json -o report.json
+```
+
+- `--fail-on critical|high|medium|low|none` (default `high`): exit code **1** if any finding is at or above that severity, so a script or CI job can stop on serious issues. Exit code **2** means a usage or runtime error.
+- `--static-only` runs only bandit/ruff/semgrep: seconds instead of minutes, and no Ollama needed (good for CI).
+- `--depth quick` runs only the security agent.
+- `--no-cache` re-audits every file (see *Re-audit only changed files*).
+
+## 🔁 Re-audit Only Changed Files
+
+When you audit something again, files that haven't changed reuse their previous result instead of being re-analyzed, which saves minutes per file on a CPU. A result is reused only if *nothing* that affects it changed: the file's content, the scan depth, the model, analysis settings, analyzer versions, and the auditor's own analysis code. Results where the AI failed (e.g. Ollama was down) are never reused. Reused files are marked **unchanged** in the UI.
+
+Turn it off per run with `use_cache: false` (API) or `--no-cache` (CLI), or globally with `CACHE_ENABLED=false`.
+
+## 📤 SARIF Export
+
+**Export SARIF** on the Results and History pages (or `--format sarif` on the command line) saves findings in SARIF 2.1.0, the standard format for code-scanning results. GitHub's code scanning (free for public repositories) and VS Code's SARIF Viewer show each finding at its file and line.
+
+---
+
 ## 🔬 Static Analysis
 
 Before the AI agents run, each file is scanned by real analyzers. They never execute your code — they only read it.

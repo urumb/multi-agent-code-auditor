@@ -8,6 +8,8 @@ import type { AuditResultResponse, FileAuditResult } from "@/lib/api";
 import { exportAuditAsJson, exportAuditAsPdf } from "@/lib/export";
 import { AuditReportView } from "@/components/results/audit-report-view";
 import { SeverityBadge } from "@/components/results/severity-badge";
+import { FileStatusBadge } from "@/components/results/file-status-badge";
+import { auditSarifUrl } from "@/lib/api";
 import type { Severity } from "@/types";
 
 const RESULT_KEY = "latestAuditResult";
@@ -143,6 +145,17 @@ export default function ResultsPage() {
                         <Download className="h-4 w-4 text-primary" />
                         Export PDF
                     </button>
+                    {result.job_id && (
+                        <a
+                            href={auditSarifUrl(result.job_id)}
+                            download
+                            title="SARIF: the standard format for code-scanning results (GitHub code scanning, VS Code SARIF Viewer)"
+                            className="flex items-center gap-2 rounded-md bg-secondary border border-border px-3.5 py-2 text-sm font-medium text-foreground hover:border-[#34363a] transition-colors"
+                        >
+                            <FileText className="h-4 w-4 text-primary" />
+                            Export SARIF
+                        </a>
+                    )}
                 </div>
             </div>
 
@@ -182,15 +195,7 @@ export default function ResultsPage() {
                                     </span>
                                 )}
                             </div>
-                            {file.error ? (
-                                <span className="inline-flex items-center rounded-full bg-red-500/10 text-red-400 border border-red-500/20 px-2.5 py-0.5 text-xs font-medium">
-                                    error
-                                </span>
-                            ) : (
-                                <span className="inline-flex items-center rounded-full bg-primary/10 text-primary border border-primary/20 px-2.5 py-0.5 text-xs font-medium">
-                                    report ready
-                                </span>
-                            )}
+                            <FileStatusBadge file={file} />
                         </button>
 
                         {/* Expanded report */}

@@ -35,13 +35,15 @@ def audit_stream_start(request: AuditRequest, background_tasks: BackgroundTasks)
             raise HTTPException(status_code=400, detail="github_url is required")
         # Cloning can take minutes, so it happens inside the background job.
         job_id = create_job(request.github_url.split("github.com/")[-1], input_type="github")
-        background_tasks.add_task(run_github_audit_job, job_id, request.github_url, request.depth)
+        background_tasks.add_task(
+            run_github_audit_job, job_id, request.github_url, request.depth, request.use_cache
+        )
         return {"job_id": job_id}
 
     code_files = process_pasted_code(request.code, request.language)
     job_id = create_job("Pasted Code", input_type="paste")
     code_files = cap_file_count(code_files, job_id=job_id)
-    background_tasks.add_task(run_audit_job, job_id, code_files, request.depth)
+    background_tasks.add_task(run_audit_job, job_id, code_files, request.depth, request.use_cache)
     return {"job_id": job_id}
 
 
@@ -50,6 +52,7 @@ async def audit_stream_upload_start(
     background_tasks: BackgroundTasks,
     files: List[UploadFile] = File(...),
     depth: str = Form("full"),
+    use_cache: bool = Form(True),
 ) -> dict:
     """Start an uploaded-files audit in the background and return its job_id."""
     logger.info("Received background upload audit request — %d file(s)", len(files))
@@ -58,7 +61,9 @@ async def audit_stream_upload_start(
     identifier = code_files[0].path if len(code_files) == 1 else f"{len(code_files)} uploaded files"
     job_id = create_job(identifier, input_type="upload")
     code_files = cap_file_count(code_files, job_id=job_id)
-    background_tasks.add_task(run_audit_job, job_id, code_files, depth if depth in ("quick", "full") else "full")
+    background_tasks.add_task(
+        run_audit_job, job_id, code_files, depth if depth in ("quick", "full") else "full", use_cache
+    )
     return {"job_id": job_id}
 
 

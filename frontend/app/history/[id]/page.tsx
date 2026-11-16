@@ -3,7 +3,8 @@
 import { useEffect, useState, use as usePromise } from "react";
 import Link from "next/link";
 import { ArrowLeft, Download, FileJson, FileText, AlertTriangle } from "lucide-react";
-import { fetchAuditHistoryDetail, type AuditHistoryDetail } from "@/lib/api";
+import { auditSarifUrl, fetchAuditHistoryDetail, type AuditHistoryDetail } from "@/lib/api";
+import { FileStatusBadge } from "@/components/results/file-status-badge";
 import { exportAuditAsJson, exportAuditAsPdf } from "@/lib/export";
 import { AuditReportView } from "@/components/results/audit-report-view";
 import { SeverityBadge } from "@/components/results/severity-badge";
@@ -136,6 +137,15 @@ function HistoryDetailView({ id }: { id: string }) {
                                 <Download className="h-4 w-4 text-primary" />
                                 Export PDF
                             </button>
+                            <a
+                                href={auditSarifUrl(detail.id)}
+                                download
+                                title="SARIF: the standard format for code-scanning results (GitHub code scanning, VS Code SARIF Viewer)"
+                                className="flex items-center gap-2 rounded-md bg-secondary border border-border px-3.5 py-2 text-sm font-medium text-foreground hover:border-[#34363a] transition-colors"
+                            >
+                                <FileText className="h-4 w-4 text-primary" />
+                                Export SARIF
+                            </a>
                         </div>
                     )}
                 </div>
@@ -178,15 +188,7 @@ function HistoryDetailView({ id }: { id: string }) {
                                         <SeverityBadge severity={(file.max_severity.toLowerCase() as Severity) || "low"} />
                                     )}
                                 </div>
-                                {file.error ? (
-                                    <span className="inline-flex items-center rounded-full bg-red-500/10 text-red-400 border border-red-500/20 px-2.5 py-0.5 text-xs font-medium">
-                                        error
-                                    </span>
-                                ) : (
-                                    <span className="inline-flex items-center rounded-full bg-primary/10 text-primary border border-primary/20 px-2.5 py-0.5 text-xs font-medium">
-                                        report ready
-                                    </span>
-                                )}
+                                <FileStatusBadge file={file} />
                             </button>
                             {expandedFile === file.file_path && (
                                 <div className="border-t border-border p-5">

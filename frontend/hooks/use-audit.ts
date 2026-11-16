@@ -232,6 +232,7 @@ export function useAudit(): UseAuditReturn {
                 },
                 onDone: (data: { total_files: number; files_skipped?: number; duration?: number }) => {
                     const finalResult: AuditResultResponse = {
+                        job_id: jobId,
                         total_files: data.total_files,
                         files_skipped: data.files_skipped ?? 0,
                         results: resultsRef.current,
