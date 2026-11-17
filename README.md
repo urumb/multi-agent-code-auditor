@@ -16,6 +16,12 @@ An AI-powered, multi-agent, local-first code auditing system.
 - ⚡ **Real-Time Streaming**: Live execution tracking via Server-Sent Events (SSE).
 - 📈 **Incremental Results**: Audit results stream into the UI precisely as each file finishes.
 - 🎚️ **Scan Depth**: *Quick* runs only the Security agent (fastest); *Full* runs Security, Performance, Quality and the Reviewer.
+- ⏹️ **Cancel Anytime**: Stop a running audit; files that already finished are kept.
+- 🔁 **Re-audit Only Changed Files**: Unchanged files reuse their previous result, so repeat audits take seconds.
+- ⚠️ **Honest Reports**: If the AI can't run (e.g. Ollama is stopped), the report says *"This audit is incomplete"* instead of pretending.
+- 💻 **Command Line**: `python main.py scan <folder>` with `--fail-on` exit codes for scripts and CI, plus a fast `--static-only` mode.
+- 📤 **SARIF Export**: Download findings in the standard code-scanning format for GitHub code scanning or VS Code.
+- 🚀 **Deployment-Ready**: Optional login, HTTPS (Caddy + Let's Encrypt) and rate limits for running it on a server.
 - 🔒 **100% Local Inference**: Powered by Ollama. Your code never leaves your machine.
 - 💸 **Zero Cost**: No API keys, no paid services, no cloud. Everything runs on your own hardware.
 
@@ -54,9 +60,14 @@ graph TD
 - Next.js 16 (App Router)
 - React 19 + framer-motion (nav indicator only)
 - Tailwind CSS 4, Recharts, React Flow (both lazy-loaded)
+- Playwright (browser tests)
 
 **AI Models**
-- Ollama (LLaMA 3.2 or DeepSeek-Coder)
+- Ollama with any local model. Default: `qwen2.5-coder:3b` (chosen by the benchmark: more accurate and faster than `llama3.2`). Switch models in Settings.
+
+**Deployment & CI**
+- Docker / Docker Compose, Caddy (automatic HTTPS) for servers
+- GitHub Actions: lint, type checks, tests, browser tests, dependency audits; CodeQL code scanning
 
 ---
 
@@ -89,7 +100,7 @@ docker compose up --build
 
 Open http://localhost:3000. The first start downloads the model (`qwen2.5-coder:3b`, ~2 GB) into a Docker volume; later starts are quick. Audit history is kept in the `auditor_data` volume.
 
-- **Security:** ports are published on `127.0.0.1` only, so the unauthenticated backend isn't reachable from your network. Ollama isn't published at all.
+- **Security:** login is off in this local setup, so ports are published on `127.0.0.1` only and the backend isn't reachable from your network. Ollama isn't published at all. For a server, see *Deployment*.
 - **Use the Ollama already on your machine** instead of the bundled one (no second model download):
   ```bash
   OLLAMA_BASE_URL=http://host.docker.internal:11434 docker compose up --build --no-deps frontend backend
@@ -153,8 +164,9 @@ npm start
 2. **Submit Source Code**: Provide a public GitHub URL, upload files or a `.zip`, or paste raw code.
    Supported: `.py .js .jsx .ts .tsx .java .c .cpp .cs .go .rb .php .rs .kt .swift`. Large repos are capped to the `MAX_FILES_PER_AUDIT` smallest files per run (default 25); the report says how many were skipped.
 3. **Execute**: Click "Run Audit".
-4. **Monitor**: View live logs tracking exactly what the internal agents are analyzing. (You may safely navigate away—the audit continues running in the background and reconnects instantly upon return).
-5. **Review**: Read the synthesized structural and security improvements outputted by the Reviewer Agent.
+4. **Monitor**: View live logs tracking exactly what the internal agents are analyzing. (You may safely navigate away—the audit continues running in the background and reconnects instantly upon return.) Click **Cancel audit** to stop it; finished files are kept.
+5. **Review**: Open **Results** to see each file's findings with severity, line number, who reported it (e.g. *bandit + AI*), and a suggested fix. Past audits are under **History**.
+6. **Export**: Download a report as JSON, PDF or SARIF.
 
 ---
 
@@ -199,6 +211,26 @@ Before the AI agents run, each file is scanned by real analyzers. They never exe
 Install semgrep with `pipx install semgrep` (its own isolated environment), **not** into the project's virtualenv: its dependencies conflict with FastAPI's and ChromaDB's pinned versions. The auditor finds it on your `PATH`. Without it, JS/TS files are covered only by the AI agents, which find far less (see *Benchmark*).
 
 semgrep runs fully offline against the bundled rule file with metrics disabled; nothing is downloaded or uploaded. Point `SEMGREP_RULES` at your own rule file to extend it. Set `STATIC_ANALYSIS_ENABLED=false` to turn the pre-pass off.
+
+---
+
+## 🧪 Testing
+
+```bash
+# Backend: lint + 106 tests (no Ollama needed; the model is faked)
+ruff check .
+pytest -q
+
+# Frontend: lint, type check, build, then 14 browser tests (backend is faked in the browser)
+cd frontend
+npm run lint
+npx tsc --noEmit
+npm run build
+npx playwright install chromium     # once
+npm run test:e2e
+```
+
+CI (`.github/workflows/ci.yml`) runs all of the above on every push and pull request, plus a dependency vulnerability audit (`pip-audit`, `npm audit`) that also runs weekly. GitHub CodeQL scans the code for security issues.
 
 ---
 
@@ -258,7 +290,10 @@ Rough timings on a laptop CPU with `qwen2.5-coder:3b`: Quick ~20-35s per file, F
 | Problem | Fix |
 |---|---|
 | Header shows **offline** | The backend isn't running on port 8000. Start it (step 4). |
+| Backend won't start: *port 8000 already in use* | Another program uses port 8000. Stop it, or run the backend on another port (`--port 8001`) and set that address in **Settings → Backend API URL**. |
+| Report says **"This audit is incomplete"** | The AI agents couldn't reach Ollama, so only static-analysis findings are shown. Start Ollama and run the audit again. |
 | Audits fail or time out | Make sure Ollama is running (`ollama serve`) and the model is pulled (`ollama pull qwen2.5-coder:3b`). |
+| Login page appears locally | Login is only on when `AUTH_ENABLED=true` (server setup). Remove it from your `.env` for local use. |
 | GitHub audit fails immediately | The repo must be public and `git` must be installed. |
 | Audit times out or is slow | Use **Quick** scan depth, a smaller model, or audit fewer files. See *Performance Notes*. |
 | Model not in Settings list | Only installed models are listed. Run `ollama pull <model>`. |
@@ -311,10 +346,11 @@ What the production setup does (`docker-compose.prod.yml`, `deploy/Caddyfile`):
 ## 🗂️ Project Layout
 
 ```
+main.py                        command-line entry (scan, hash-password, new-secret)
 backend/app/main.py            FastAPI app: lifespan, CORS, router wiring
 backend/app/routers/           HTTP routes: audit (start, stream, cancel), history (+ SARIF), settings, auth
 backend/app/security.py        login (scrypt hashes, signed sessions) and rate limiting
-backend/app/services/          audit_jobs (running audits), job_store (live jobs), db (SQLite), input_processor
+backend/app/services/          audit_jobs (running audits), job_store (live jobs), db (SQLite history + cache), input_processor
 src/graph.py                   LangGraph pipeline: manager -> static analysis -> agents -> reviewer
 src/agents/                    Manager, Reviewer, and the Security/Performance/Quality agents (shared base.py)
 src/static_analysis.py         bandit / ruff / semgrep pre-pass
@@ -322,6 +358,7 @@ src/findings.py                finding schema, line anchoring, merging and de-du
 src/cli.py, src/sarif.py       command line (python main.py scan) and SARIF export
 rules/semgrep.yml              bundled offline semgrep rules (JS/TS)
 benchmarks/                    labeled sample files + recall/precision scorer
+tests/                         backend tests (pytest)
 docker/, docker-compose.yml    local container setup
 docker-compose.prod.yml, deploy/  server setup: Caddy (HTTPS), login, rate limits
 frontend/                      Next.js UI (browser tests in frontend/e2e)
