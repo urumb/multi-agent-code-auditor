@@ -77,3 +77,6 @@ nohup.out
 frontend/test-results/
 frontend/playwright-report/
 frontend/blob-report/
+
+# Personal working notes for AI-assisted sessions (never commit)
+PROJECT_CONTEXT.md
