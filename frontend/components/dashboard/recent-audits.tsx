@@ -45,7 +45,7 @@ export function RecentAudits({ audits }: RecentAuditsProps) {
                     return (
                         <Link
                             key={audit.id}
-                            href={`/history/${audit.id}`}
+                            href={`/history/view?id=${encodeURIComponent(audit.id)}`}
                             className="group flex flex-col sm:flex-row sm:items-center gap-3 rounded-md border border-transparent px-3 py-2.5 transition-colors duration-150 hover:bg-secondary"
                         >
                             <div className="flex items-center gap-3 flex-1 min-w-0">

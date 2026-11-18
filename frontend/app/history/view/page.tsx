@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState, use as usePromise } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { ArrowLeft, Download, FileJson, FileText, AlertTriangle } from "lucide-react";
 import { fetchAuditHistoryDetail, type AuditHistoryDetail } from "@/lib/api";
 import { FileStatusBadge } from "@/components/results/file-status-badge";
@@ -20,8 +21,24 @@ const STATUS_CLASSES: Record<string, string> = {
     cancelled: "bg-muted text-muted-foreground border-border",
 };
 
-export default function HistoryDetailPage({ params }: { params: Promise<{ id: string }> }) {
-    const { id } = usePromise(params);
+/**
+ * One past audit: /history/view?id=<audit id>.
+ *
+ * The id is a query parameter (not a /history/<id> path segment) so the
+ * page can be exported as a static file for the desktop app, which has no
+ * server to render dynamic routes.
+ */
+export default function HistoryDetailPage() {
+    // useSearchParams needs a Suspense boundary to be exported statically.
+    return (
+        <Suspense fallback={<Skeleton className="h-40 w-full" />}>
+            <HistoryDetailFromQuery />
+        </Suspense>
+    );
+}
+
+function HistoryDetailFromQuery() {
+    const id = useSearchParams().get("id") ?? "";
     // Keyed on `id` so navigating between two audit ids remounts this
     // subtree — each id gets its own fresh loading/detail state instead of
     // needing an effect to reset state synchronously mid-lifecycle.

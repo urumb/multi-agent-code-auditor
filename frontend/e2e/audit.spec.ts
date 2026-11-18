@@ -153,7 +153,7 @@ test("history shows an incomplete audit's warning", async ({ page }) => {
 
     await page.goto("/history");
     await page.getByText("Pasted Code").first().click();
-    await expect(page).toHaveURL(/\/history\/abc$/);
+    await expect(page).toHaveURL(/\/history\/view\?id=abc$/);
     await page.getByText("pasted_input.py").first().click();
     await expect(page.getByText("This audit is incomplete")).toBeVisible();
     await expect(page.getByText(warning, { exact: false })).toBeVisible();
@@ -214,4 +214,17 @@ test("AI can be switched off in Settings without Ollama", async ({ page }) => {
 
     await expect(page.getByText("tools-only audits (AI off)")).toBeVisible();
     expect(saved).toEqual({ ai_enabled: false });
+});
+
+test("history detail encodes the id it reads from the address bar", async ({ page }) => {
+    await fakeBasics(page);
+    const requested: string[] = [];
+    await page.route(`${API}/**`, (route) => {
+        requested.push(new URL(route.request().url()).pathname);
+        return json(route, { detail: "Audit not found" }, 404);
+    });
+    await page.goto("/history/view?id=" + encodeURIComponent("../settings"));
+    await expect(page.getByText(/not found/i).first()).toBeVisible();
+    expect(requested).toContain("/audit/history/..%2Fsettings");
+    expect(requested).not.toContain("/audit/settings");
 });

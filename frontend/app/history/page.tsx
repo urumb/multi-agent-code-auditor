@@ -98,7 +98,7 @@ export default function HistoryPage() {
                         {entries.map((entry) => (
                             <Link
                                 key={entry.id}
-                                href={`/history/${entry.id}`}
+                                href={`/history/view?id=${encodeURIComponent(entry.id)}`}
                                 className="flex items-center gap-4 px-5 py-3.5 hover:bg-secondary transition-colors"
                             >
                                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-secondary border border-border">

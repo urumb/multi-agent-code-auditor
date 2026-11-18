@@ -454,7 +454,9 @@ export async function fetchAuditHistory(limit = 20, offset = 0): Promise<AuditHi
 }
 
 export async function fetchAuditHistoryDetail(jobId: string): Promise<AuditHistoryDetail> {
-    return apiFetch<AuditHistoryDetail>(`/audit/history/${jobId}`);
+    // The id comes from the address bar now (?id=...): encode it so it can't
+    // walk to a different API path (e.g. "../settings").
+    return apiFetch<AuditHistoryDetail>(`/audit/history/${encodeURIComponent(jobId)}`);
 }
 
 export async function checkBackendHealth(): Promise<boolean> {

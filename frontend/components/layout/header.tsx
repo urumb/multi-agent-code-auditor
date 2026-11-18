@@ -202,7 +202,7 @@ export function Header() {
                                             return (
                                                 <Link
                                                     key={audit.id}
-                                                    href={`/history/${audit.id}`}
+                                                    href={`/history/view?id=${encodeURIComponent(audit.id)}`}
                                                     onClick={() => setIsNotifOpen(false)}
                                                     className={cn(
                                                         "flex gap-3 px-4 py-3 transition-colors duration-200 hover:bg-secondary",
