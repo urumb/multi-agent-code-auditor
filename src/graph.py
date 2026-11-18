@@ -40,9 +40,19 @@ def _get_memory() -> AuditMemory:
     return memory
 
 
-def _planned_agents(state: AuditorState) -> set[str]:
+def _requested_categories(state: AuditorState) -> set[str]:
+    """Finding categories this audit covers (Quick = security only)."""
     plan = state.get("execution_plan") or {}
     return set(plan.get("agents", [])) & ENABLED_AGENTS
+
+
+def _ai_enabled(state: AuditorState) -> bool:
+    return (state.get("execution_plan") or {}).get("ai", True) is not False
+
+
+def _planned_agents(state: AuditorState) -> set[str]:
+    """AI agents that will actually run: none in tools-only mode."""
+    return _requested_categories(state) if _ai_enabled(state) else set()
 
 
 def _emit(state: AuditorState, event_type: str, agent_name: str) -> None:
@@ -75,7 +85,12 @@ def manager_node(state: AuditorState):
     try:
         result = manager.run(state)
         _emit(state, "agent_completed", agent_name)
-        _emit_payload(state, "execution_plan", result.get("execution_plan", {}))
+        plan = dict(result.get("execution_plan", {}))
+        if plan.get("ai") is False:
+            # The UI builds its progress stages from this; no agents will run.
+            plan["agents"] = []
+            plan["reason"] = "Tools-only audit (AI agents are off)"
+        _emit_payload(state, "execution_plan", plan)
         return result
     except Exception:
         _emit(state, "agent_failed", agent_name)
@@ -84,10 +99,11 @@ def manager_node(state: AuditorState):
 def static_node(state: AuditorState):
     """Run bandit/ruff/semgrep once over the whole file before the LLM agents.
 
-    Only findings for agents in the execution plan are kept, so a Quick
-    (security-only) scan doesn't report quality/performance lint.
+    Only findings in the requested categories are kept, so a Quick
+    (security-only) scan doesn't report quality/performance lint. This
+    doesn't depend on the AI being on: tools-only audits use it too.
     """
-    planned = _planned_agents(state)
+    planned = _requested_categories(state)
     findings = [
         f for f in run_static_analysis(state.get("original_code", ""), state.get("file_path") or "input.py")
         if f.get("agent") in planned
@@ -154,16 +170,30 @@ def finalize_node(state: AuditorState):
 
     all_findings = build_findings(state)
     risk_info = compute_risk_score(all_findings)
+    ai = _ai_enabled(state)
 
-    if all_findings:
-        summary = f"{len(all_findings)} finding(s) detected by the Security Agent and static analysis."
+    if not ai:
+        executive = (
+            "Tools-only audit: the AI agents are off, so these findings come from "
+            "static analysis (bandit, ruff, semgrep). Turn AI on in Settings for a deeper review."
+        )
+        found_by = "static analysis"
     else:
-        summary = "No issues were detected by the Security Agent or static analysis."
+        executive = (
+            "Quick security scan - only the Security Agent ran. "
+            "Run a Full scan for performance and quality analysis too."
+        )
+        found_by = "the Security Agent and static analysis"
+    if all_findings:
+        summary = f"{len(all_findings)} finding(s) detected by {found_by}."
+    else:
+        summary = f"No issues were detected by {found_by}."
 
     return {
         "final_report": json.dumps({
-            "Executive Summary": "Quick security scan - only the Security Agent ran. Run a Full scan for performance and quality analysis too.",
+            "Executive Summary": executive,
             "Findings Summary": summary,
+            "ai_enabled": ai,
             "risk_score": risk_info["risk_score"],
             "risk_breakdown": risk_info["risk_breakdown"],
             "max_severity": risk_info["max_severity"],

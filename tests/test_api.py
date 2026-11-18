@@ -200,3 +200,17 @@ def test_cancel_endpoint_status_codes(client):
     job_id = client.post("/audit/stream", json={"input_type": "paste", "code": "c = 1\n" * 30}).json()["job_id"]
     _events(client, job_id)  # already finished
     assert client.post(f"/audit/stream/{job_id}/cancel").status_code == 409
+
+
+def test_ai_switch_works_without_ollama(client, monkeypatch):
+    def down():
+        raise ConnectionError("refused")
+
+    monkeypatch.setattr("src.llm.installed_models", down)
+    monkeypatch.setattr(Config, "AI_ENABLED", True)
+    assert client.get("/settings").json()["ai_enabled"] is True
+    resp = client.post("/settings", json={"ai_enabled": False})
+    assert resp.status_code == 200 and resp.json()["ai_enabled"] is False
+    assert client.get("/settings").json()["ai_enabled"] is False
+    # Changing the model still needs Ollama.
+    assert client.post("/settings", json={"model": "other"}).status_code == 503

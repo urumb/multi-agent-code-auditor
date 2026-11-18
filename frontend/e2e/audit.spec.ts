@@ -192,3 +192,26 @@ test("settings refuses to save a non-http backend address", async ({ page }) => 
     await expect(page.getByText("The backend URL must start with http:// or https://")).toBeVisible();
     expect(await page.evaluate(() => window.localStorage.getItem("apiUrl"))).toBeNull();
 });
+
+test("AI can be switched off in Settings without Ollama", async ({ page }) => {
+    await fakeBasics(page);
+    let saved: Record<string, unknown> | null = null;
+    await page.route(`${API}/settings/**`, (route) => json(route, { detail: "Ollama down" }, 503));
+    await page.route(`${API}/settings`, async (route) => {
+        if (route.request().method() === "POST") {
+            saved = route.request().postDataJSON();
+            return json(route, { status: "ok", model: "qwen2.5-coder:3b", ai_enabled: false });
+        }
+        return json(route, { model: "qwen2.5-coder:3b", ai_enabled: true });
+    });
+
+    await page.goto("/settings");
+    const toggle = page.getByRole("switch", { name: "AI agents" });
+    await expect(toggle).toHaveAttribute("aria-checked", "true");
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-checked", "false");
+    await page.getByRole("button", { name: "Save Settings" }).click();
+
+    await expect(page.getByText("tools-only audits (AI off)")).toBeVisible();
+    expect(saved).toEqual({ ai_enabled: false });
+});

@@ -2,6 +2,7 @@
 import logging
 import ast
 from typing import Dict, List, Tuple
+from ..config import Config
 from ..state import AuditorState
 
 logger = logging.getLogger(__name__)
@@ -122,6 +123,9 @@ class ManagerAgent:
         repository_file_count = state.get("repository_file_count") or 1
         snippets, total_chunks = self.split_code_with_stats(original_code)
         execution_plan = self.build_execution_plan(original_code, repository_file_count, state.get("depth") or "full")
+        # Whether the AI agents run at all (tools-only when off). The plan's
+        # "agents" still name the requested categories for static analysis.
+        execution_plan["ai"] = Config.AI_ENABLED
         execution_plan["chunks_total"] = total_chunks
         execution_plan["chunks_analyzed"] = len(snippets)
         if total_chunks > len(snippets):

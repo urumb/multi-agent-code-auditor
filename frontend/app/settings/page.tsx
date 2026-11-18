@@ -75,6 +75,15 @@ export default function SettingsPage() {
         return () => clearTimeout(timer);
     }, []);
 
+    // AI agents on/off (tools-only when off). null until loaded from the backend.
+    const [aiEnabled, setAiEnabled] = useState<boolean | null>(null);
+    useEffect(() => {
+        authFetch(`${getApiBase()}/settings`)
+            .then((res) => (res.ok ? res.json() : null))
+            .then((data) => setAiEnabled(data ? Boolean(data.ai_enabled) : null))
+            .catch(() => setAiEnabled(null));
+    }, []);
+
     useEffect(() => {
         // Only offer models that are really installed in Ollama.
         fetchInstalledModels()
@@ -100,14 +109,15 @@ export default function SettingsPage() {
             const res = await authFetch(`${base}/settings`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ model })
+                // With AI off the model isn't sent, so saving works without Ollama.
+                body: JSON.stringify(aiEnabled === false ? { ai_enabled: false } : { model, ai_enabled: aiEnabled ?? true }),
             });
             if (!res.ok) {
                 const body = await res.json().catch(() => null);
                 toast.error(body?.detail ?? "Backend rejected the model.");
                 return;
             }
-            toast.success(`Settings saved - using ${model}`);
+            toast.success(aiEnabled === false ? "Settings saved - tools-only audits (AI off)" : `Settings saved - using ${model}`);
             checkOllamaConnection();
         } catch {
             toast.error("Settings saved locally, but failed to sync with backend.");
@@ -177,7 +187,28 @@ export default function SettingsPage() {
                          ollamaStatus === "error" ? "Connection Error" : "Checking..."}
                     </span>
                 </div>
-                <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                    <div>
+                        <p className="text-sm font-medium text-foreground">AI agents</p>
+                        <p className="text-xs text-muted-foreground">
+                            Off = tools-only audits: bandit, ruff and semgrep still run, no Ollama needed.
+                        </p>
+                    </div>
+                    <button
+                        type="button"
+                        role="switch"
+                        aria-checked={aiEnabled !== false}
+                        aria-label="AI agents"
+                        disabled={aiEnabled === null}
+                        onClick={() => setAiEnabled(aiEnabled === false)}
+                        className={`relative h-6 w-11 rounded-full transition-colors disabled:opacity-50 ${aiEnabled !== false ? "bg-primary" : "bg-muted"}`}
+                    >
+                        <span
+                            className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white transition-transform ${aiEnabled !== false ? "translate-x-5" : "translate-x-0"}`}
+                        />
+                    </button>
+                </div>
+                <div className={`space-y-3 ${aiEnabled === false ? "opacity-50" : ""}`}>
                     <label className="text-sm font-medium text-foreground" htmlFor="model-select">
                         LLM Model
                     </label>
@@ -221,6 +252,9 @@ export default function SettingsPage() {
                     </div>
                     <button
                         type="button"
+                        role="switch"
+                        aria-checked={autoRetry}
+                        aria-label="Auto-retry on failure"
                         onClick={() => setAutoRetry(!autoRetry)}
                         className={`relative h-6 w-11 rounded-full transition-colors ${autoRetry ? "bg-primary" : "bg-muted"
                             }`}

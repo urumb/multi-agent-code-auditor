@@ -86,6 +86,11 @@ class Config:
     # audit settings haven't changed) instead of re-auditing them.
     CACHE_ENABLED = os.getenv("CACHE_ENABLED", "true").lower() == "true"
 
+    # AI agents (Ollama). Off = tools-only audits: bandit/ruff/semgrep still
+    # run, no model is needed, and reports say they are tools-only. Can also be
+    # switched at runtime from the Settings page.
+    AI_ENABLED = os.getenv("AI_ENABLED", "true").lower() == "true"
+
     # Run bandit / ruff (and semgrep, if installed) before the LLM agents.
     STATIC_ANALYSIS_ENABLED = os.getenv("STATIC_ANALYSIS_ENABLED", "true").lower() == "true"
 

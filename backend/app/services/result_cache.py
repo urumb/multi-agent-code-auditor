@@ -63,6 +63,7 @@ def cache_key(content: str, file_path: str, depth: str) -> str:
         os.path.splitext(file_path)[1].lower(),
         depth,
         Config.MODEL_NAME,
+        Config.AI_ENABLED,
         Config.MAX_FINDINGS_PER_CHUNK,
         Config.STATIC_ANALYSIS_ENABLED,
         Config.REVIEWER_USE_LLM,

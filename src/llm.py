@@ -90,6 +90,9 @@ def warm_up_model() -> None:
     (often 10-60s on CPU). Failures are ignored; Ollama may simply be down.
     """
 
+    if not Config.AI_ENABLED:
+        return  # tools-only mode: no model needed
+
     def _warm() -> None:
         try:
             requests.post(

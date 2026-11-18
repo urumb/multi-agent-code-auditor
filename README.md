@@ -18,6 +18,7 @@ An AI-powered, multi-agent, local-first code auditing system.
 - 🎚️ **Scan Depth**: *Quick* runs only the Security agent (fastest); *Full* runs Security, Performance, Quality and the Reviewer.
 - ⏹️ **Cancel Anytime**: Stop a running audit; files that already finished are kept.
 - 🔁 **Re-audit Only Changed Files**: Unchanged files reuse their previous result, so repeat audits take seconds.
+- 🧰 **Tools-Only Mode**: Turn the AI agents off in Settings (or `AI_ENABLED=false`) for fast audits that need no Ollama at all.
 - ⚠️ **Honest Reports**: If the AI can't run (e.g. Ollama is stopped), the report says *"This audit is incomplete"* instead of pretending.
 - 💻 **Command Line**: `python main.py scan <folder>` with `--fail-on` exit codes for scripts and CI, plus a fast `--static-only` mode.
 - 📤 **SARIF Export**: Download findings in the standard code-scanning format for GitHub code scanning or VS Code.
@@ -291,7 +292,7 @@ Rough timings on a laptop CPU with `qwen2.5-coder:3b`: Quick ~20-35s per file, F
 |---|---|
 | Header shows **offline** | The backend isn't running on port 8000. Start it (step 4). |
 | Backend won't start: *port 8000 already in use* | Another program uses port 8000. Stop it, or run the backend on another port (`--port 8001`) and set that address in **Settings → Backend API URL**. |
-| Report says **"This audit is incomplete"** | The AI agents couldn't reach Ollama, so only static-analysis findings are shown. Start Ollama and run the audit again. |
+| Report says **"This audit is incomplete"** | The AI agents couldn't reach Ollama, so only static-analysis findings are shown. Start Ollama and run the audit again, or switch **AI agents** off in Settings for tools-only audits. |
 | Audits fail or time out | Make sure Ollama is running (`ollama serve`) and the model is pulled (`ollama pull qwen2.5-coder:3b`). |
 | Login page appears locally | Login is only on when `AUTH_ENABLED=true` (server setup). Remove it from your `.env` for local use. |
 | GitHub audit fails immediately | The repo must be public and `git` must be installed. |

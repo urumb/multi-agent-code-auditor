@@ -11,7 +11,8 @@ router = APIRouter(tags=["settings"])
 
 
 class SettingsUpdate(BaseModel):
-    model: str
+    model: str | None = None
+    ai_enabled: bool | None = None
 
 
 def _model_installed(requested: str, installed: list[str]) -> bool:
@@ -26,26 +27,35 @@ def list_models() -> dict:
         models = llm.installed_models()
     except Exception as e:
         raise HTTPException(status_code=503, detail=f"Could not list Ollama models: {e}")
-    return {"models": models, "current": Config.MODEL_NAME}
+    return {"models": models, "current": Config.MODEL_NAME, "ai_enabled": Config.AI_ENABLED}
+
+
+@router.get("/settings")
+def get_settings() -> dict:
+    """Current settings; works even when Ollama isn't running."""
+    return {"model": Config.MODEL_NAME, "ai_enabled": Config.AI_ENABLED}
 
 
 @router.post("/settings")
 def update_settings(settings: SettingsUpdate) -> dict:
-    """Switch the active model. Rejects models that aren't installed, so a
-    typo or un-pulled model fails here instead of failing every audit."""
-    try:
-        installed = llm.installed_models()
-    except Exception as e:
-        raise HTTPException(status_code=503, detail=f"Ollama is not reachable: {e}")
-    if not _model_installed(settings.model, installed):
-        raise HTTPException(
-            status_code=400,
-            detail=f"Model '{settings.model}' is not installed. Run: ollama pull {settings.model}",
-        )
-    if Config.MODEL_NAME != settings.model:
+    """Switch AI on/off and/or the active model. A model change is rejected
+    if the model isn't installed, so a typo or un-pulled model fails here
+    instead of failing every audit. Turning AI off needs no Ollama."""
+    if settings.model is not None and settings.model != Config.MODEL_NAME:
+        try:
+            installed = llm.installed_models()
+        except Exception as e:
+            raise HTTPException(status_code=503, detail=f"Ollama is not reachable: {e}")
+        if not _model_installed(settings.model, installed):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Model '{settings.model}' is not installed. Run: ollama pull {settings.model}",
+            )
         Config.MODEL_NAME = settings.model
-        llm.warm_up_model()
-    return {"status": "ok", "model": Config.MODEL_NAME}
+    if settings.ai_enabled is not None:
+        Config.AI_ENABLED = settings.ai_enabled
+    llm.warm_up_model()  # no-op when AI is off
+    return {"status": "ok", "model": Config.MODEL_NAME, "ai_enabled": Config.AI_ENABLED}
 
 
 @router.get("/settings/ollama")
