@@ -1,6 +1,7 @@
 "use client";
 
 import { AuditForm } from "@/components/audit/audit-form";
+import { AiSetupCard } from "@/components/audit/ai-setup-card";
 import { ProgressIndicator } from "@/components/audit/progress-indicator";
 import { AgentActivityLog } from "@/components/audit/agent-activity-log";
 import dynamic from "next/dynamic";
@@ -102,6 +103,9 @@ export default function AuditPage() {
             </div>
 
             <div className="mx-auto flex max-w-5xl flex-col gap-5">
+                {/* Ollama not running / model missing: how to fix, or go tools-only */}
+                {status === "idle" && <AiSetupCard />}
+
                 {/* Audit form */}
                 <AuditForm onSubmit={handleSubmit} isRunning={status === "running"} />
 

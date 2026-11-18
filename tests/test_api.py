@@ -214,3 +214,17 @@ def test_ai_switch_works_without_ollama(client, monkeypatch):
     assert client.get("/settings").json()["ai_enabled"] is False
     # Changing the model still needs Ollama.
     assert client.post("/settings", json={"model": "other"}).status_code == 503
+
+
+def test_ai_status_when_ollama_down_and_up(client, monkeypatch):
+    def down():
+        raise ConnectionError("refused")
+
+    monkeypatch.setattr("src.llm.installed_models", down)
+    s = client.get("/settings/status").json()
+    assert s["ollama_reachable"] is False and s["model_installed"] is False
+
+    monkeypatch.setattr("src.llm.installed_models", lambda: [f"{Config.MODEL_NAME}:latest" if ":" not in Config.MODEL_NAME else Config.MODEL_NAME])
+    s = client.get("/settings/status").json()
+    assert s["ollama_reachable"] is True and s["model_installed"] is True
+    assert client.post("/settings/models/pull", json={"model": "bad name"}).status_code == 400

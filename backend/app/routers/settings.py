@@ -4,6 +4,7 @@ import requests
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from backend.app.services import model_pull
 from src import llm
 from src.config import Config
 
@@ -28,6 +29,40 @@ def list_models() -> dict:
     except Exception as e:
         raise HTTPException(status_code=503, detail=f"Could not list Ollama models: {e}")
     return {"models": models, "current": Config.MODEL_NAME, "ai_enabled": Config.AI_ENABLED}
+
+
+class PullRequest(BaseModel):
+    model: str
+
+
+@router.get("/settings/status")
+def ai_status() -> dict:
+    """Everything the setup card needs in one call: is AI on, is Ollama
+    reachable, and is the chosen model installed."""
+    try:
+        models = llm.installed_models()
+        reachable = True
+    except Exception:
+        models, reachable = [], False
+    return {
+        "ai_enabled": Config.AI_ENABLED,
+        "ollama_reachable": reachable,
+        "model": Config.MODEL_NAME,
+        "model_installed": reachable and _model_installed(Config.MODEL_NAME, models),
+        "models": models,
+        "pull": model_pull.status(),
+    }
+
+
+@router.post("/settings/models/pull")
+def pull_model(body: PullRequest) -> dict:
+    """Download a model into Ollama in the background (poll /settings/status)."""
+    try:
+        return model_pull.start(body.model)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
 
 
 @router.get("/settings")

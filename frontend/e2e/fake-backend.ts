@@ -56,4 +56,18 @@ export async function fakeBasics(page: Page) {
     await page.route(`${API}/recent-audits`, (r) => json(r, []));
     await page.route(`${API}/metrics`, (r) => json(r, []));
     await page.route(`${API}/trends`, (r) => json(r, []));
+    // AI ready by default, so the setup card stays hidden unless a test says otherwise.
+    await page.route(`${API}/settings/status`, (r) => json(r, aiStatus()));
+}
+
+export function aiStatus(overrides: Record<string, unknown> = {}) {
+    return {
+        ai_enabled: true,
+        ollama_reachable: true,
+        model: "qwen2.5-coder:3b",
+        model_installed: true,
+        models: ["qwen2.5-coder:3b"],
+        pull: { model: null, status: "idle", completed: 0, total: 0, error: null },
+        ...overrides,
+    };
 }

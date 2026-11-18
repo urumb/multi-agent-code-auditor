@@ -476,3 +476,45 @@ export async function checkBackendHealth(): Promise<boolean> {
         return false;
     }
 }
+
+/* ------------------------------------------------------------------ */
+/*  AI / Ollama setup                                                  */
+/* ------------------------------------------------------------------ */
+
+export interface ModelPullStatus {
+    model: string | null;
+    status: "idle" | "pulling" | "done" | "error";
+    completed: number;
+    total: number;
+    error: string | null;
+}
+
+export interface AiStatus {
+    ai_enabled: boolean;
+    ollama_reachable: boolean;
+    model: string;
+    model_installed: boolean;
+    models: string[];
+    pull: ModelPullStatus;
+}
+
+export async function fetchAiStatus(): Promise<AiStatus> {
+    return apiFetch<AiStatus>("/settings/status");
+}
+
+/** Start downloading a model into Ollama (progress via fetchAiStatus().pull). */
+export async function startModelPull(model: string): Promise<void> {
+    await apiFetch("/settings/models/pull", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model }),
+    });
+}
+
+export async function setAiEnabled(enabled: boolean): Promise<void> {
+    await apiFetch("/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ai_enabled: enabled }),
+    });
+}
