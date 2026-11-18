@@ -18,6 +18,7 @@ An AI-powered, multi-agent, local-first code auditing system.
 - 🎚️ **Scan Depth**: *Quick* runs only the Security agent (fastest); *Full* runs Security, Performance, Quality and the Reviewer.
 - ⏹️ **Cancel Anytime**: Stop a running audit; files that already finished are kept.
 - 🔁 **Re-audit Only Changed Files**: Unchanged files reuse their previous result, so repeat audits take seconds.
+- 🖥️ **Desktop App**: A Windows app (no Python, Node or terminal needed) that opens in its own window and walks you through setting up Ollama.
 - 🧰 **Tools-Only Mode**: Turn the AI agents off in Settings (or `AI_ENABLED=false`) for fast audits that need no Ollama at all.
 - ⚠️ **Honest Reports**: If the AI can't run (e.g. Ollama is stopped), the report says *"This audit is incomplete"* instead of pretending.
 - 💻 **Command Line**: `python main.py scan <folder>` with `--fail-on` exit codes for scripts and CI, plus a fast `--static-only` mode.
@@ -66,7 +67,8 @@ graph TD
 **AI Models**
 - Ollama with any local model. Default: `qwen2.5-coder:3b` (chosen by the benchmark: more accurate and faster than `llama3.2`). Switch models in Settings.
 
-**Deployment & CI**
+**Desktop & Deployment & CI**
+- pywebview (native window on Windows' built-in WebView2) and PyInstaller (packaging) for the desktop app
 - Docker / Docker Compose, Caddy (automatic HTTPS) for servers
 - GitHub Actions: lint, type checks, tests, browser tests, dependency audits; CodeQL code scanning
 
@@ -86,6 +88,31 @@ data: {
   }
 }
 ```
+
+---
+
+## 🖥️ Desktop App (Windows)
+
+The easiest way to use the auditor: one download, double-click, and it opens in its own window. Everything still runs on your computer.
+
+1. Download `MultiAgentAuditor-windows-x64.zip` from the repository's [Releases](https://github.com/urumb/multi-agent-code-auditor/releases) page and unzip it anywhere.
+2. Run `MultiAgentAuditor.exe`. Windows may show **"Windows protected your PC"** the first time because the app isn't code-signed (signing certificates cost money). Click **More info → Run anyway**.
+3. For AI agents, install [Ollama](https://ollama.com/download) (free). The Audit page notices if it's missing and offers a one-click download of the model. Without Ollama, choose **Use tools-only** and audits run with bandit and ruff alone.
+
+- Your audit history, cache and logs are kept in `%LOCALAPPDATA%\MultiAgentAuditor` (logs in `logs\app.log`). A `.env` file there can change settings (e.g. `MODEL_NAME`).
+- The app listens only on `127.0.0.1` on a free port, with no login needed. Closing the window stops it completely.
+- semgrep isn't bundled; JS/TS files are checked by the AI agents unless you install semgrep separately (`pipx install semgrep`).
+
+**Build it yourself:**
+
+```bash
+pip install -r requirements-desktop.txt
+cd frontend && npm ci && npm run build:desktop && cd ..
+pyinstaller desktop/auditor.spec --noconfirm --distpath build/desktop/dist --workpath build/desktop/work
+build/desktop/dist/MultiAgentAuditor/MultiAgentAuditor.exe --smoke-test   # quick self-check
+```
+
+You can also run it from source without packaging: `python desktop/app.py` (after `npm run build:desktop`). The `Desktop app` GitHub Actions workflow builds and smoke-tests it on every relevant push; pushing a version tag (e.g. `v0.7.0`) publishes a release.
 
 ---
 
@@ -231,6 +258,8 @@ npx playwright install chromium     # once
 npm run test:e2e
 ```
 
+The desktop app has its own self-check: `MultiAgentAuditor.exe --smoke-test` (or `python desktop/app.py --smoke-test`) starts the bundled server, runs a tools-only audit and checks that bandit and ruff findings come back.
+
 CI (`.github/workflows/ci.yml`) runs all of the above on every push and pull request, plus a dependency vulnerability audit (`pip-audit`, `npm audit`) that also runs weekly. GitHub CodeQL scans the code for security issues.
 
 ---
@@ -348,6 +377,8 @@ What the production setup does (`docker-compose.prod.yml`, `deploy/Caddyfile`):
 
 ```
 main.py                        command-line entry (scan, hash-password, new-secret)
+desktop/app.py, auditor.spec   desktop app launcher (window, free port, data folder) and PyInstaller build
+backend/app/standalone.py      one server for UI + API (used by the desktop app)
 backend/app/main.py            FastAPI app: lifespan, CORS, router wiring
 backend/app/routers/           HTTP routes: audit (start, stream, cancel), history (+ SARIF), settings, auth
 backend/app/security.py        login (scrypt hashes, signed sessions) and rate limiting
@@ -362,7 +393,7 @@ benchmarks/                    labeled sample files + recall/precision scorer
 tests/                         backend tests (pytest)
 docker/, docker-compose.yml    local container setup
 docker-compose.prod.yml, deploy/  server setup: Caddy (HTTPS), login, rate limits
-frontend/                      Next.js UI (browser tests in frontend/e2e)
+frontend/                      Next.js UI (browser tests in frontend/e2e; `npm run build:desktop` = static export)
 ```
 
 ---
