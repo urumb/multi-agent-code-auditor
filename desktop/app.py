@@ -151,25 +151,34 @@ def wait_until_up(base: str, timeout: float = 60) -> None:
 # ---------------------------------------------------------------------------
 # Smoke test (used in CI on every build)
 # ---------------------------------------------------------------------------
-SMOKE_CODE = "import os\n\n\ndef ping(host):\n    return os.system('ping -c 1 ' + host)\n"
+SMOKE_CODE = (
+    '"""Smoke-test sample: long enough for a full (not "small snippet") plan."""\n'
+    "import os\n"
+    "import sys\n\n\n"
+    "def ping(host):\n"
+    "    # bandit B605 (shell command), and ruff F401 (sys unused) above\n"
+    "    return os.system('ping -c 1 ' + host)\n"
+)
 
 
 def smoke_test(base: str) -> int:
-    """Run one tools-only audit end to end: proves the UI, the API and the
-    bundled analyzers all work in this build."""
+    """Run one tools-only audit end to end: proves the UI, the API and both
+    bundled analyzers (bandit B605, ruff F401) work in this build."""
     page = urllib.request.urlopen(f"{base}/", timeout=10).read().decode()
     if "<html" not in page.lower():
         print("smoke test: UI not served", file=sys.stderr)
         return 1
-    body = json.dumps({"input_type": "paste", "language": "python", "depth": "quick",
+    body = json.dumps({"input_type": "paste", "language": "python", "depth": "full",
                        "use_cache": False, "code": SMOKE_CODE}).encode()
     req = urllib.request.Request(f"{base}/api/audit/stream", data=body,
                                  headers={"Content-Type": "application/json"})
     job_id = json.load(urllib.request.urlopen(req, timeout=30))["job_id"]
     stream = urllib.request.urlopen(f"{base}/api/audit/stream/{job_id}", timeout=180).read().decode()
-    found = "B605" in stream and '"type": "done"' in stream
-    print(f"smoke test: UI ok, audit {'found bandit B605' if found else 'FAILED'}")
-    return 0 if found else 1
+    checks = {"bandit (B605)": "B605" in stream, "ruff (F401)": "F401" in stream,
+              "audit finished": '"type": "done"' in stream}
+    for name, ok in checks.items():
+        print(f"smoke test: {name}: {'ok' if ok else 'FAILED'}")
+    return 0 if all(checks.values()) else 1
 
 
 # ---------------------------------------------------------------------------
