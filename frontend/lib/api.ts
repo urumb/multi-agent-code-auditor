@@ -28,6 +28,15 @@ export function sanitizeApiBase(value: string | null | undefined): string | null
 
 const DEFAULT_API_BASE = sanitizeApiBase(process.env.NEXT_PUBLIC_API_URL) ?? "http://localhost:8000";
 
+/** The backend address this build was made for (env default, no user override). */
+export const BUILD_API_BASE = DEFAULT_API_BASE;
+
+/**
+ * True when the UI and API share one address ("/api"): the desktop app and
+ * the production (Caddy) deployment. There's no backend address to choose.
+ */
+export const SAME_ORIGIN_API = DEFAULT_API_BASE.startsWith("/");
+
 /**
  * Resolves the backend API base URL, preferring a user override saved from
  * the Settings page (localStorage "apiUrl") over the build-time env default.

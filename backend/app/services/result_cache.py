@@ -71,5 +71,8 @@ def cache_key(content: str, file_path: str, depth: str) -> str:
         os.getenv("SEMGREP_RULES", ""),
         shutil.which("semgrep") is not None,
         _code_fingerprint(),
+        # Packaged desktop app: its .py sources aren't on disk to fingerprint,
+        # so the app version invalidates results across releases.
+        os.getenv("AUDITOR_BUILD", ""),
     ]
     return hashlib.sha256(json.dumps(parts).encode("utf-8")).hexdigest()

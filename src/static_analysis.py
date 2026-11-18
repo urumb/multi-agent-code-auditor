@@ -96,6 +96,8 @@ def _run(cmd: List[str], cwd: str) -> Optional[str]:
             timeout=TOOL_TIMEOUT_SECONDS,
             stdin=subprocess.DEVNULL,
             env={**os.environ, "PYTHONIOENCODING": "utf-8"},
+            # Windows: don't flash a console window (desktop app has none).
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
         logger.warning("Static analyzer failed to run (%s): %s", cmd[0], exc)

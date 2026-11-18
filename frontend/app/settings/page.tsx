@@ -6,7 +6,9 @@ import {
     authFetch,
     fetchAuthStatus,
     fetchInstalledModels,
+    BUILD_API_BASE,
     getApiBase,
+    SAME_ORIGIN_API,
     logout,
     sanitizeApiBase,
     type AuthStatus,
@@ -20,7 +22,7 @@ import { toast } from "sonner";
 import { useEffect } from "react";
 
 export default function SettingsPage() {
-    const [apiUrl, setApiUrl] = useState("http://localhost:8000");
+    const [apiUrl, setApiUrl] = useState(BUILD_API_BASE);
     const [model, setModel] = useState("qwen2.5-coder:3b");
     const [autoRetry, setAutoRetry] = useState(true);
     const [installedModels, setInstalledModels] = useState<string[]>([]);
@@ -95,12 +97,13 @@ export default function SettingsPage() {
     }, []);
 
     const handleSave = async () => {
-        const base = sanitizeApiBase(apiUrl);
+        const base = SAME_ORIGIN_API ? BUILD_API_BASE : sanitizeApiBase(apiUrl);
         if (!base) {
             toast.error("The backend URL must start with http:// or https://");
             return;
         }
-        localStorage.setItem("apiUrl", base);
+        if (SAME_ORIGIN_API) localStorage.removeItem("apiUrl");
+        else localStorage.setItem("apiUrl", base);
         localStorage.setItem("model", model);
         localStorage.setItem("autoRetry", String(autoRetry));
 
@@ -125,7 +128,7 @@ export default function SettingsPage() {
     };
 
     const handleReset = () => {
-        setApiUrl("http://localhost:8000");
+        setApiUrl(BUILD_API_BASE);
         setModel("qwen2.5-coder:3b");
         setAutoRetry(true);
         localStorage.removeItem("apiUrl");
@@ -146,7 +149,9 @@ export default function SettingsPage() {
                 </p>
             </div>
 
-            {/* API Configuration */}
+            {/* API Configuration: not shown when the UI and API share one address
+                (desktop app, production deployment): there's nothing to configure. */}
+            {!SAME_ORIGIN_API && (
             <div className="glass-card p-5 space-y-4">
                 <div className="flex items-center gap-2">
                     <Server className="h-4 w-4 text-primary" />
@@ -170,6 +175,7 @@ export default function SettingsPage() {
                     </p>
                 </div>
             </div>
+            )}
 
             {/* Model Configuration */}
             <div className="glass-card p-6 space-y-4">

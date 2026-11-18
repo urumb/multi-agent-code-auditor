@@ -1,0 +1,5 @@
+# Desktop app (Batch 5): native window + packaging. Not needed for the web app.
+# Build: see desktop/README section in the main README.
+-r requirements.txt
+pywebview==6.2.1      # native window using the system WebView2 (BSD)
+pyinstaller==6.22.3   # bundles Python + app into an .exe (GPL with bootloader exception)
