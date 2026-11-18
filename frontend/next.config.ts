@@ -9,8 +9,14 @@ if (!process.env.NEXT_TELEMETRY_DISABLED) {
     process.env.NEXT_TELEMETRY_DISABLED = "1";
 }
 
+// Desktop build (npm run build:desktop): plain HTML/JS files in out/, served
+// by the Python backend inside the desktop app. trailingSlash makes each page
+// a folder with index.html (/history/view/index.html), which a simple static
+// file server can serve without rewrites. The normal web build is unchanged.
+const desktopExport = process.env.NEXT_OUTPUT === "export";
+
 const nextConfig: NextConfig = {
-  /* config options here */
+  ...(desktopExport ? { output: "export" as const, trailingSlash: true } : {}),
 };
 
 export default nextConfig;
