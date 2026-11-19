@@ -118,12 +118,20 @@ jobs:
           if (Test-Path $lnk) { throw "Uninstall left the Start menu shortcut behind" }
           "install / smoke test / uninstall: ok"
 
+      - name: Collect downloads
+        # Side by side at the top level: an artifact keeps each file's folder
+        # path, and the release job looks for both files by name.
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force release-files | Out-Null
+          Move-Item MultiAgentAuditor-windows-x64.zip release-files/
+          Copy-Item build/desktop/installer/MultiAgentAuditor-Setup-*.exe release-files/
+          Get-ChildItem release-files
+
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: MultiAgentAuditor-windows-x64
-          path: |
-            MultiAgentAuditor-windows-x64.zip
-            build/desktop/installer/MultiAgentAuditor-Setup-*.exe
+          path: release-files/*
           retention-days: 30
 
   release:
@@ -142,5 +150,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          ls -la
           gh release create "$GITHUB_REF_NAME" MultiAgentAuditor-Setup-*.exe MultiAgentAuditor-windows-x64.zip \
             --repo "$GITHUB_REPOSITORY" --title "Multi-Agent Code Auditor $GITHUB_REF_NAME" --generate-notes
