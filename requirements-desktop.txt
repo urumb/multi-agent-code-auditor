@@ -3,3 +3,4 @@
 -r requirements.txt
 pywebview==6.2.1      # native window using the system WebView2 (BSD)
 pyinstaller==6.22.3   # bundles Python + app into an .exe (GPL with bootloader exception)
+pillow==13.0.0        # only to regenerate the icon (desktop/make_icon.py); MIT-CMU license

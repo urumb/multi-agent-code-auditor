@@ -95,12 +95,13 @@ data: {
 
 The easiest way to use the auditor: one download, double-click, and it opens in its own window. Everything still runs on your computer.
 
-1. Download `MultiAgentAuditor-windows-x64.zip` from the repository's [Releases](https://github.com/urumb/multi-agent-code-auditor/releases) page and unzip it anywhere.
-2. Run `MultiAgentAuditor.exe`. Windows may show **"Windows protected your PC"** the first time because the app isn't code-signed (signing certificates cost money). Click **More info → Run anyway**.
+1. From the repository's [Releases](https://github.com/urumb/multi-agent-code-auditor/releases) page, download **`MultiAgentAuditor-Setup-<version>.exe`** (recommended) and run it. It installs for your user only (no admin rights needed), adds a Start-menu shortcut (desktop shortcut optional) and an uninstaller in *Settings → Apps*. Prefer no installer? Download `MultiAgentAuditor-windows-x64.zip`, unzip it anywhere and run `MultiAgentAuditor.exe`.
+2. Windows may show **"Windows protected your PC"** the first time because the app isn't code-signed (signing certificates cost money). Click **More info → Run anyway**.
 3. For AI agents, install [Ollama](https://ollama.com/download) (free). The Audit page notices if it's missing and offers a one-click download of the model. Without Ollama, choose **Use tools-only** and audits run with bandit and ruff alone.
 
 - Your audit history, cache and logs are kept in `%LOCALAPPDATA%\MultiAgentAuditor` (logs in `logs\app.log`). A `.env` file there can change settings (e.g. `MODEL_NAME`).
 - The app listens only on `127.0.0.1` on a free port, with no login needed. Closing the window stops it completely.
+- Uninstalling removes the app but keeps your audit history in `%LOCALAPPDATA%\MultiAgentAuditor` (delete that folder to remove it too). Installing a newer version upgrades in place.
 - semgrep isn't bundled; JS/TS files are checked by the AI agents unless you install semgrep separately (`pipx install semgrep`).
 
 **Build it yourself:**
@@ -110,9 +111,13 @@ pip install -r requirements-desktop.txt
 cd frontend && npm ci && npm run build:desktop && cd ..
 pyinstaller desktop/auditor.spec --noconfirm --distpath build/desktop/dist --workpath build/desktop/work
 build/desktop/dist/MultiAgentAuditor/MultiAgentAuditor.exe --smoke-test   # quick self-check
+# Optional installer (needs Inno Setup 6, free: https://jrsoftware.org/isinfo.php)
+iscc desktop\installer.iss /DAppVersion=0.8.0
 ```
 
-You can also run it from source without packaging: `python desktop/app.py` (after `npm run build:desktop`). The `Desktop app` GitHub Actions workflow builds and smoke-tests it on every relevant push; pushing a version tag (e.g. `v0.7.0`) publishes a release.
+The icon is drawn in code (`desktop/make_icon.py`, Pillow) and shared by the app, the installer and the web UI.
+
+You can also run it from source without packaging: `python desktop/app.py` (after `npm run build:desktop`). The `Desktop app` GitHub Actions workflow builds it, smoke-tests the packaged app, builds the installer and tests a full install → run → uninstall on every relevant push. Pushing a version tag that matches `APP_VERSION` in `desktop/app.py` (e.g. `v0.8.0`) publishes a release with both downloads.
 
 ---
 
@@ -377,7 +382,8 @@ What the production setup does (`docker-compose.prod.yml`, `deploy/Caddyfile`):
 
 ```
 main.py                        command-line entry (scan, hash-password, new-secret)
-desktop/app.py, auditor.spec   desktop app launcher (window, free port, data folder) and PyInstaller build
+desktop/                       app.py (launcher: window, free port, data folder), auditor.spec (PyInstaller),
+                               installer.iss (Inno Setup), make_icon.py + assets/ (icon)
 backend/app/standalone.py      one server for UI + API (used by the desktop app)
 backend/app/main.py            FastAPI app: lifespan, CORS, router wiring
 backend/app/routers/           HTTP routes: audit (start, stream, cancel), history (+ SARIF), settings, auth

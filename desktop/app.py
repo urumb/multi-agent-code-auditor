@@ -29,7 +29,7 @@ if not getattr(sys, "frozen", False):
 
 APP_NAME = "MultiAgentAuditor"
 APP_TITLE = "Multi-Agent Code Auditor"
-APP_VERSION = "0.7.0"
+APP_VERSION = "0.8.0"
 FROZEN = getattr(sys, "frozen", False)
 
 

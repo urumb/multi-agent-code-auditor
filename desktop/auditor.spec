@@ -57,6 +57,7 @@ exe = EXE(
     exclude_binaries=True,
     name="MultiAgentAuditor",
     console=False,                         # windowed app, logs go to %LOCALAPPDATA%\MultiAgentAuditor\logs
+    icon=os.path.join(ROOT, "desktop", "assets", "icon.ico"),  # exe + window icon (desktop/make_icon.py)
     disable_windowed_traceback=False,
     upx=False,
 )
